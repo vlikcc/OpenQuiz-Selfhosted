@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OpenQuiz.Api/OpenQuiz.Api.csproj" />
+    <Project Path="src/OpenQuiz.Application/OpenQuiz.Application.csproj" />
+    <Project Path="src/OpenQuiz.Domain/OpenQuiz.Domain.csproj" />
+    <Project Path="src/OpenQuiz.Infrastructure/OpenQuiz.Infrastructure.csproj" />
+  </Folder>
+</Solution>
