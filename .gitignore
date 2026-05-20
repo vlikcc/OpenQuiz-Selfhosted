@@ -1,0 +1,42 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+*.pidb
+*.swp
+*.log
+
+# EF Core
+**/Migrations/Designer.cs
+
+# Rider / VS
+.idea/
+*.DotSettings.user
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Local
+secrets.json
+appsettings.Development.json
+appsettings.Local.json
+
+# Docker
+*.tar
