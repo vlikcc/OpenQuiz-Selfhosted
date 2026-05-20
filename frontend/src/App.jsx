@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Trophy, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { CONTENT_TYPES, POLL_TYPE_KEY } from './config/constants';
 import { useAuth } from './hooks/useAuth';
@@ -20,48 +21,55 @@ const urlParams = new URLSearchParams(window.location.search);
 const isVoterMode = urlParams.get('mode') === 'voter' && !!urlParams.get('id');
 const initialPollId = urlParams.get('id');
 
-const VoterLoadingScreen = ({ pollData }) => (
-  <div className="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-6">
-    <div className="text-center">
-      {pollData ? (
-        <>
-          <div className="text-6xl mb-4">{CONTENT_TYPES[POLL_TYPE_KEY[pollData.type]]?.icon || '🎯'}</div>
-          <h1 className="text-2xl font-bold mb-2">{pollData.title}</h1>
-          <p className="text-indigo-200 mb-6">{pollData.questions?.length || 0} soru</p>
-        </>
-      ) : (
-        <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Trophy size={32} />
+const VoterLoadingScreen = ({ pollData }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="h-full w-full flex flex-col items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-6">
+      <div className="text-center">
+        {pollData ? (
+          <>
+            <div className="text-6xl mb-4">{CONTENT_TYPES[POLL_TYPE_KEY[pollData.type]]?.icon || '🎯'}</div>
+            <h1 className="text-2xl font-bold mb-2">{pollData.title}</h1>
+            <p className="text-indigo-200 mb-6">{pollData.questions?.length || 0} {t('common.question')}</p>
+          </>
+        ) : (
+          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Trophy size={32} />
+          </div>
+        )}
+        <div className="flex items-center justify-center gap-3">
+          <Loader2 className="animate-spin" size={24} />
+          <span className="text-lg font-medium">{t('common.preparing')}</span>
         </div>
-      )}
-      <div className="flex items-center justify-center gap-3">
-        <Loader2 className="animate-spin" size={24} />
-        <span className="text-lg font-medium">Hazırlanıyor...</span>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-const LoadingScreen = () => (
-  <div className="h-full w-full flex items-center justify-center bg-slate-50">
-    <div className="text-center">
-      <Loader2 className="animate-spin text-indigo-600 mx-auto mb-4" size={40} />
-      <p className="text-slate-500">Yükleniyor...</p>
+const LoadingScreen = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="h-full w-full flex items-center justify-center bg-slate-50">
+      <div className="text-center">
+        <Loader2 className="animate-spin text-indigo-600 mx-auto mb-4" size={40} />
+        <p className="text-slate-500">{t('common.loading')}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error, info) { console.error('Hata:', error, info); }
+  componentDidCatch(error, info) { console.error('Error:', error, info); }
   render() {
-    if (this.state.hasError) return <div className="p-10 text-center">Bir hata oluştu. Lütfen sayfayı yenileyin.</div>;
+    if (this.state.hasError) return <div className="p-10 text-center">{this.props.fallbackMessage}</div>;
     return this.props.children;
   }
 }
 
 export default function App() {
+  const { t } = useTranslation();
   const { user, loading: authLoading, logout } = useAuth();
   const isAdmin = !!user?.isAdmin;
   const isAuthorized = !!user?.canCreate || isAdmin;
@@ -103,29 +111,29 @@ export default function App() {
   const handleGoogleLogin = async (idToken) => {
     try {
       await authService.googleLogin(idToken);
-      showToast('Giriş başarılı!');
+      showToast(t('auth.loginSuccess'));
     } catch (err) {
       console.error(err);
-      showToast(err.message || 'Google ile giriş başarısız', 'error');
+      showToast(err.message || t('auth.googleFailed'), 'error');
       throw err;
     }
   };
 
   const handleEmailLogin = async (email, password) => {
     await authService.login(email, password);
-    showToast('Giriş başarılı!');
+    showToast(t('auth.loginSuccess'));
   };
 
   const handleEmailRegister = async (email, password, displayName) => {
     await authService.register(email, password, displayName);
-    showToast('Kayıt başarılı!');
+    showToast(t('auth.registerSuccess'));
   };
 
   const handleLogout = async () => {
     await logout();
     setActiveTab('dashboard');
     setActiveScreen('tabs');
-    showToast('Çıkış yapıldı');
+    showToast(t('auth.logoutSuccess'));
   };
 
   const handlePasswordReset = async (email) => {
@@ -136,7 +144,7 @@ export default function App() {
   if (isVoterMode && initialPollId) {
     if (authLoading && tokenStore.getAccessToken()) return <VoterLoadingScreen pollData={preloadedPoll} />;
     return (
-      <ErrorBoundary>
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
         <div className="h-full w-full flex flex-col overflow-hidden">
           <VoterMode
             pollId={activePollId}
@@ -161,7 +169,7 @@ export default function App() {
   if (!user) {
     if (!showLandingPage) {
       return (
-        <ErrorBoundary>
+        <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
           <AuthScreen
             onGoogleLogin={handleGoogleLogin}
             onEmailLogin={handleEmailLogin}
@@ -174,7 +182,7 @@ export default function App() {
       );
     }
     return (
-      <ErrorBoundary>
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
         <LandingPage onLogin={() => setShowLandingPage(false)} />
       </ErrorBoundary>
     );
@@ -182,7 +190,7 @@ export default function App() {
 
   if (activeScreen === 'presenter' && activePollId) {
     return (
-      <ErrorBoundary>
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
         <div className="h-full w-full flex flex-col overflow-hidden">
           <PresenterMode
             pollId={activePollId}
@@ -203,7 +211,7 @@ export default function App() {
 
   if (activeScreen === 'voter' && activePollId) {
     return (
-      <ErrorBoundary>
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
         <div className="h-full w-full flex flex-col overflow-hidden">
           <VoterMode pollId={activePollId} onExit={() => navigate('dashboard')} user={user} showToast={showToast} />
         </div>
@@ -213,11 +221,11 @@ export default function App() {
 
   if (activeScreen === 'admin' && isAdmin) {
     return (
-      <ErrorBoundary>
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
         <div className="h-full w-full flex flex-col overflow-hidden bg-slate-50">
           <div className="bg-slate-900 text-white p-4 flex items-center gap-4">
-            <button onClick={() => navigate('dashboard')} className="text-white/70 hover:text-white">← Geri</button>
-            <h1 className="font-bold">Admin Paneli</h1>
+            <button onClick={() => navigate('dashboard')} className="text-white/70 hover:text-white">← {t('common.back')}</button>
+            <h1 className="font-bold">{t('admin.title')}</h1>
           </div>
           <div className="flex-1 overflow-y-auto">
             <AdminPanel showToast={showToast} />
@@ -228,7 +236,7 @@ export default function App() {
   }
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
       <div className="h-full w-full bg-slate-50 flex flex-col overflow-hidden">
         {toast && (
           <div className={`fixed top-4 left-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium flex items-center gap-2 animate-bounce-in z-50 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-800'}`}>

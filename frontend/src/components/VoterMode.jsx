@@ -6,11 +6,13 @@ import { voteService } from '../services/voteService';
 import { wordcloudService } from '../services/wordcloudService';
 import { reactionService } from '../services/reactionService';
 import { realtimeService } from '../services/realtimeService';
+import { useTranslation } from 'react-i18next';
 import KatexRenderer from './KatexRenderer';
 import WaitingRoom from './WaitingRoom';
 import WordCloudVoter from './wordcloud/WordCloudVoter';
 
 export default function VoterMode({ pollId, onExit, user, showToast, preloadedPoll = null }) {
+  const { t } = useTranslation();
   const [step, setStep] = useState('name');
   const [userName, setUserName] = useState('');
   const [poll, setPoll] = useState(preloadedPoll);
@@ -25,6 +27,8 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const votedQuestionsRef = useRef(new Set());
+
+  const ct = (key) => t(`contentTypes.${key}.label`);
 
   useEffect(() => {
     const saved = localStorage.getItem('voterName');
@@ -125,7 +129,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
       setHasVotedForCurrent(true);
       setLastResult(typeCfg.hasCorrectAnswer ? (result.isCorrect ? 'correct' : 'wrong') : 'voted');
     } catch (err) {
-      showToast(err.message || 'Oy gönderilemedi', 'error');
+      showToast(err.message || t('voter.voteFailed'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -141,7 +145,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
       setLastResult('submitted');
       setOpenAnswer('');
     } catch (err) {
-      showToast(err.message || 'Cevap gönderilemedi', 'error');
+      showToast(err.message || t('voter.answerFailed'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -155,7 +159,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
       setHasVotedForCurrent(true);
       setLastResult('submitted');
     } catch (err) {
-      showToast(err.message || 'Gönderilemedi', 'error');
+      showToast(err.message || t('voter.submitFailed'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -177,12 +181,12 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white max-w-sm w-full p-8 rounded-3xl shadow-xl text-center">
           <div className="text-5xl mb-4">{typeCfg.icon}</div>
-          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 bg-${typeCfg.color}-100 text-${typeCfg.color}-700`}>{typeCfg.label}</span>
+          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 bg-${typeCfg.color}-100 text-${typeCfg.color}-700`}>{ct(typeKey)}</span>
           <h2 className="text-2xl font-bold mb-2">{poll.title}</h2>
-          <p className="text-slate-500 text-sm mb-6">{poll.questions?.length || 0} soru</p>
+          <p className="text-slate-500 text-sm mb-6">{poll.questions?.length || 0} {t('common.question')}</p>
           <form onSubmit={handleStart}>
-            <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl mb-4 text-center font-bold text-lg focus:border-indigo-500 outline-none" placeholder="Adınız" required />
-            <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg">Katıl</button>
+            <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl mb-4 text-center font-bold text-lg focus:border-indigo-500 outline-none" placeholder={t('voter.yourName')} required />
+            <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg">{t('voter.join')}</button>
           </form>
         </div>
       </div>
@@ -195,9 +199,9 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
         <div className="min-h-screen flex flex-col items-center justify-center p-6 text-white text-center bg-indigo-500">
           <div className="bg-white/20 backdrop-blur-md p-10 rounded-3xl shadow-2xl">
             <CheckCircle2 size={64} className="mx-auto mb-4" />
-            <h2 className="text-4xl font-black mb-2">{lastResult === 'submitted' ? 'GÖNDERİLDİ!' : 'TEŞEKKÜRLER!'}</h2>
+            <h2 className="text-4xl font-black mb-2">{lastResult === 'submitted' ? t('voter.sent') : t('voter.thankYou')}</h2>
             <div className="flex items-center justify-center gap-2 bg-black/20 px-4 py-2 rounded-full text-sm font-medium animate-pulse">
-              <Loader2 size={16} className="animate-spin" /> Sonraki soru için bekle...
+              <Loader2 size={16} className="animate-spin" /> {t('voter.waitingForNext')}
             </div>
           </div>
         </div>
@@ -207,9 +211,9 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
       <div className={`min-h-screen flex flex-col items-center justify-center p-6 text-white text-center ${lastResult === 'correct' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
         <div className="bg-white/20 backdrop-blur-md p-10 rounded-3xl shadow-2xl">
           {lastResult === 'correct' ? <CheckCircle2 size={64} className="mx-auto mb-4" /> : <XCircle size={64} className="mx-auto mb-4" />}
-          <h2 className="text-4xl font-black mb-2">{lastResult === 'correct' ? 'DOĞRU!' : 'YANLIŞ'}</h2>
+          <h2 className="text-4xl font-black mb-2">{lastResult === 'correct' ? t('voter.correct') : t('voter.wrong')}</h2>
           <div className="flex items-center justify-center gap-2 bg-black/20 px-4 py-2 rounded-full text-sm font-medium animate-pulse">
-            <Loader2 size={16} className="animate-spin" /> Sunucu sonraki soruya geçene kadar bekle...
+            <Loader2 size={16} className="animate-spin" /> {t('voter.waitingForPresenter')}
           </div>
         </div>
       </div>
@@ -217,7 +221,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
   }
 
   const q = poll.questions[currentQIndex];
-  if (!q) return <div className="h-screen flex items-center justify-center">Yarışma sona erdi.</div>;
+  if (!q) return <div className="h-screen flex items-center justify-center">{t('voter.ended')}</div>;
 
   const typeKey = POLL_TYPE_KEY[poll.type] || 'contest';
   const isExam = typeKey === 'exam';
@@ -231,17 +235,17 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
         <div className="flex justify-between items-center mb-3">
           <div className="flex items-center gap-2">
             <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-bold ${isExam ? 'bg-rose-100 text-rose-700' : isWordCloud ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'}`}>
-              SORU {currentQIndex + 1}
+              {t('voter.question')} {currentQIndex + 1}
             </span>
-            {isOpen && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold">AÇIK UÇLU</span>}
-            {isWordCloud && <span className="bg-sky-100 text-sky-700 px-2 py-0.5 rounded text-[10px] font-bold">KELİME BULUTU</span>}
-            {isExam && q.points && <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">{q.points} Puan</span>}
+            {isOpen && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold">{t('voter.open')}</span>}
+            {isWordCloud && <span className="bg-sky-100 text-sky-700 px-2 py-0.5 rounded text-[10px] font-bold">{t('voter.wordCloud')}</span>}
+            {isExam && q.points && <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">{t('voter.points', { n: q.points })}</span>}
           </div>
-          <span className="text-red-500 text-xs font-bold animate-pulse">CANLI</span>
+          <span className="text-red-500 text-xs font-bold animate-pulse">{t('common.live')}</span>
         </div>
 
         <div className="text-lg sm:text-xl font-bold text-slate-900">
-          {q.imageUrl && (<div className="mb-4"><img src={q.imageUrl} alt="Soru" className="max-h-48 rounded-lg shadow-sm mx-auto object-contain" /></div>)}
+          {q.imageUrl && (<div className="mb-4"><img src={q.imageUrl} alt="" className="max-h-48 rounded-lg shadow-sm mx-auto object-contain" /></div>)}
           {isExam && q.text.includes('$') ? <KatexRenderer text={q.text} /> : q.text}
         </div>
 
@@ -260,13 +264,13 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
             <textarea
               value={openAnswer}
               onChange={(e) => setOpenAnswer(e.target.value)}
-              placeholder="Cevabınızı yazın..."
+              placeholder={t('voter.yourAnswer')}
               rows={6}
               className="w-full p-4 rounded-xl border-2 border-slate-200 bg-white text-base text-slate-700 focus:border-rose-400 outline-none resize-none"
             />
             <button onClick={handleOpenAnswer} disabled={isSubmitting || !openAnswer.trim()} className="w-full py-4 bg-rose-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50">
               {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-              Cevabı Gönder
+              {t('voter.submitAnswer')}
             </button>
           </div>
         ) : (
@@ -289,7 +293,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
         {q.allowMultiple && !hasVotedForCurrent && !isOpen && !isWordCloud && (
           <button onClick={handleSubmitMulti} disabled={selectedIndices.length === 0 || isSubmitting} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 mt-4">
             {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-            Seçimlerimi Gönder ({selectedIndices.length})
+            {t('voter.submitSelections', { n: selectedIndices.length })}
           </button>
         )}
       </div>

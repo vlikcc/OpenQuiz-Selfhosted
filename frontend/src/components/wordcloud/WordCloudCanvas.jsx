@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
 import cloud from 'd3-cloud';
 import { select } from 'd3-selection';
+import { useTranslation } from 'react-i18next';
 
 const PALETTE = ['#4F46E5', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#3B82F6', '#EF4444', '#14B8A6'];
 
 export default function WordCloudCanvas({ terms = [], width = 800, height = 400 }) {
+  const { t } = useTranslation();
   const ref = useRef(null);
 
   useEffect(() => {
@@ -53,8 +55,8 @@ export default function WordCloudCanvas({ terms = [], width = 800, height = 400 
 
   if (terms.length === 0) {
     return (
-      <div className="flex items-center justify-center w-full h-full text-slate-300 italic">
-        Henüz katılım yok — kelimeler buraya canlı düşecek
+      <div className="flex items-center justify-center w-full h-full text-slate-300 italic text-center px-4">
+        {t('presenter.noJoin')}
       </div>
     );
   }

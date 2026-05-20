@@ -4,6 +4,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { GOOGLE_CLIENT_ID } from './config/constants';
 import App from './App.jsx';
 import './index.css';
+import './i18n';
 
 const root = createRoot(document.getElementById('root'));
 

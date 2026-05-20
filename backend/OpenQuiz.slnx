@@ -5,4 +5,7 @@
     <Project Path="src/OpenQuiz.Domain/OpenQuiz.Domain.csproj" />
     <Project Path="src/OpenQuiz.Infrastructure/OpenQuiz.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/OpenQuiz.DataImport/OpenQuiz.DataImport.csproj" />
+  </Folder>
 </Solution>

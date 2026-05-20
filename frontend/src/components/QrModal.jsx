@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { X, Copy, Share2, Users, CheckCircle, Link } from 'lucide-react';
 import { realtimeService } from '../services/realtimeService';
 import { pollService } from '../services/pollService';
+import { useTranslation } from 'react-i18next';
 
 export default function QrModal({ pollId, onClose, title }) {
+  const { t } = useTranslation();
   const [participantCount, setParticipantCount] = useState(0);
   const [copied, setCopied] = useState(false);
 
@@ -20,30 +22,26 @@ export default function QrModal({ pollId, onClose, title }) {
     return () => { active = false; unsubPromise.then((u) => u && u()); };
   }, [pollId]);
 
-  // Link kopyala
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(joinUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Kopyalama hatası:', err);
+      console.error('Copy error:', err);
     }
   };
 
-  // Paylaş (Web Share API)
   const handleShare = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: title || 'Yarışmaya Katıl',
-          text: `${title} yarışmasına katılmak için linke tıkla!`,
+          title: title || t('qr.shareTitle'),
+          text: t('qr.shareText', { title: title || '' }),
           url: joinUrl
         });
       } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error('Paylaşım hatası:', err);
-        }
+        if (err.name !== 'AbortError') console.error('Share error:', err);
       }
     } else {
       handleCopyLink();
@@ -61,25 +59,22 @@ export default function QrModal({ pollId, onClose, title }) {
         </button>
 
         <div className="p-8 flex flex-col items-center text-center">
-          <h3 className="text-2xl font-bold text-slate-800 mb-2">Yarışmaya Katıl</h3>
+          <h3 className="text-2xl font-bold text-slate-800 mb-2">{t('qr.title')}</h3>
           <p className="text-slate-500 mb-4 px-4">{title}</p>
 
-          {/* Katılımcı Sayacı */}
           <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full mb-4 animate-pulse">
             <Users size={18} />
-            <span className="font-semibold">{participantCount} katılımcı bekleniyor</span>
+            <span className="font-semibold">{t('qr.participantsWaiting', { count: participantCount })}</span>
           </div>
 
-          {/* QR Kod */}
           <div className="bg-white p-4 rounded-xl border-2 border-slate-100 shadow-inner mb-4">
             <img src={qrImageUrl} alt="QR Code" className="w-56 h-56 object-contain" />
           </div>
 
-          {/* Link Alanı */}
           <div className="w-full bg-slate-50 rounded-xl p-3 mb-4">
             <div className="flex items-center gap-2 text-slate-500 text-xs mb-2">
               <Link size={14} />
-              <span>veya linki paylaş</span>
+              <span>{t('qr.shareLink')}</span>
             </div>
             <div className="flex gap-2">
               <input
@@ -100,16 +95,15 @@ export default function QrModal({ pollId, onClose, title }) {
             </div>
           </div>
 
-          {/* Paylaş Butonu */}
           <button
             onClick={handleShare}
             className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:from-indigo-600 hover:to-purple-700 transition-all shadow-lg"
           >
             <Share2 size={18} />
-            Linki Paylaş
+            {t('qr.shareButton')}
           </button>
 
-          <p className="text-xs text-slate-400 mt-4">Telefonun kamerasıyla QR'ı okut veya linki paylaş</p>
+          <p className="text-xs text-slate-400 mt-4">{t('qr.scanHint')}</p>
         </div>
       </div>
     </div>

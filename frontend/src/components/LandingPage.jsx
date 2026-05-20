@@ -4,7 +4,6 @@ import {
   BarChart3,
   Users,
   Zap,
-  CheckCircle,
   QrCode,
   FileSpreadsheet,
   PieChart,
@@ -14,46 +13,49 @@ import {
   Lock,
   Smartphone
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const LandingPage = ({ onLogin }) => {
+  const { t } = useTranslation();
+
   const features = [
     {
       icon: Trophy,
-      title: "Yarışma",
-      description: "Gerçek zamanlı bilgi yarışmaları düzenleyin. Skor tablosu ve anlık sonuçlar.",
+      title: t("landing.featureContest"),
+      description: t("landing.featureContestDesc"),
       color: "from-amber-500 to-orange-600",
       bgColor: "bg-amber-50"
     },
     {
       icon: BarChart3,
-      title: "Anket",
-      description: "Hızlı anketler oluşturun, canlı oy takibi yapın. Sonuçları anında görün.",
+      title: t("landing.featureSurvey"),
+      description: t("landing.featureSurveyDesc"),
       color: "from-emerald-500 to-teal-600",
       bgColor: "bg-emerald-50"
     },
     {
       icon: Zap,
-      title: "Quiz",
-      description: "Eğitim amaçlı quizler hazırlayın. Öğrenci başarısını takip edin.",
+      title: t("landing.featureQuiz"),
+      description: t("landing.featureQuizDesc"),
       color: "from-violet-500 to-purple-600",
       bgColor: "bg-violet-50"
     },
     {
       icon: FileSpreadsheet,
-      title: "Sınav",
-      description: "Çoktan seçmeli ve açık uçlu sorularla kapsamlı sınavlar oluşturun.",
+      title: t("landing.featureExam"),
+      description: t("landing.featureExamDesc"),
       color: "from-rose-500 to-pink-600",
       bgColor: "bg-rose-50"
     }
   ];
 
   const highlights = [
-    { icon: QrCode, text: "QR Kod ile Kolay Katılım" },
-    { icon: Smartphone, text: "Mobil Uyumlu Tasarım" },
-    { icon: Globe, text: "Anlık Senkronizasyon" },
-    { icon: Lock, text: "Güvenli Altyapı" },
-    { icon: PieChart, text: "Detaylı Analiz ve Raporlar" },
-    { icon: Users, text: "Sınırsız Katılımcı" }
+    { icon: QrCode, text: t("landing.highlightQr") },
+    { icon: Smartphone, text: t("landing.highlightMobile") },
+    { icon: Globe, text: t("landing.highlightSync") },
+    { icon: Lock, text: t("landing.highlightSecurity") },
+    { icon: PieChart, text: t("landing.highlightAnalysis") },
+    { icon: Users, text: t("landing.highlightUnlimited") }
   ];
 
   return (
@@ -61,14 +63,8 @@ const LandingPage = ({ onLogin }) => {
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {/* Animated Background */}
-        {/* Animated Background - Simplified for Mobile Performance */}
         <div className="fixed inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/50 via-transparent to-purple-950/50" />
-          {/* Heavy blur effects removed for mobile stability 
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-fuchsia-600/10 rounded-full blur-3xl" />
-        */}
         </div>
 
         {/* Header */}
@@ -88,8 +84,8 @@ const LandingPage = ({ onLogin }) => {
                 onClick={onLogin}
                 className="group px-4 sm:px-6 py-2.5 bg-white text-slate-900 rounded-full font-bold text-sm hover:bg-indigo-100 transition-all shadow-lg shadow-white/20 flex items-center gap-2"
               >
-                <span className="hidden sm:inline">Giriş Yap</span>
-                <span className="sm:hidden">Giriş</span>
+                <span className="hidden sm:inline">{t("landing.login")}</span>
+                <span className="sm:hidden">{t("landing.loginShort")}</span>
                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
@@ -101,21 +97,19 @@ const LandingPage = ({ onLogin }) => {
           <div className="max-w-5xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-sm text-indigo-300 border border-indigo-500/30 mb-6 sm:mb-8">
               <Sparkles size={16} />
-              <span>Ücretsiz & Açık Kaynak</span>
+              <span>{t("landing.badge")}</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight mb-6 sm:mb-8">
-              <span className="block">Etkileşimli</span>
+              <span className="block">{t("landing.heroLine1")}</span>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-                Yarışma & Anket
+                {t("landing.heroLine2")}
               </span>
-              <span className="block">Platformu</span>
+              <span className="block">{t("landing.heroLine3")}</span>
             </h1>
 
             <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 sm:mb-12 leading-relaxed">
-              Yarışmalar, anketler, quizler ve sınavlar oluşturun.
-              <br className="hidden sm:block" />
-              Katılımcılar QR kod ile anında bağlansın. Sonuçları canlı takip edin.
+              {t("landing.heroDescription")}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -123,7 +117,7 @@ const LandingPage = ({ onLogin }) => {
                 onClick={onLogin}
                 className="group px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl font-bold text-lg hover:from-indigo-600 hover:to-purple-700 transition-all shadow-xl shadow-indigo-500/30 flex items-center justify-center gap-3"
               >
-                Hemen Başla
+                {t("landing.ctaStart")}
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </button>
 
@@ -131,21 +125,21 @@ const LandingPage = ({ onLogin }) => {
                 href="#features"
                 className="px-8 py-4 border-2 border-white/20 rounded-2xl font-bold text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-3"
               >
-                Özellikleri Keşfet
+                {t("landing.ctaFeatures")}
               </a>
             </div>
           </div>
         </section>
 
         {/* Features Grid */}
-        < section id="features" className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 lg:px-8" >
+        <section id="features" className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 lg:px-8" >
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-12 sm:mb-16">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-4 sm:mb-6">
-                Her İhtiyaca <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Özel Çözümler</span>
+                {t("landing.featuresTitle")} <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">{t("landing.featuresHighlight")}</span>
               </h2>
               <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-                Eğitimden eğlenceye, toplantılardan konferanslara kadar her ortamda kullanın
+                {t("landing.featuresSubtitle")}
               </p>
             </div>
 
@@ -167,7 +161,7 @@ const LandingPage = ({ onLogin }) => {
         </section >
 
         {/* Highlights */}
-        < section className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-y border-white/10" >
+        <section className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-y border-white/10" >
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
               {highlights.map((item, index) => (
@@ -186,20 +180,20 @@ const LandingPage = ({ onLogin }) => {
         </section >
 
         {/* How it Works */}
-        < section className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 lg:px-8" >
+        <section className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 lg:px-8" >
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12 sm:mb-16">
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-4 sm:mb-6">
-                Nasıl <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Çalışır?</span>
+                {t("landing.howTitle")} <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">{t("landing.howHighlight")}</span>
               </h2>
-              <p className="text-slate-400 text-lg">3 kolay adımda etkileşimli deneyimler yaratın</p>
+              <p className="text-slate-400 text-lg">{t("landing.howSubtitle")}</p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
               {[
-                { step: "01", title: "Oluşturun", desc: "Yarışma, anket, quiz veya sınav oluşturun. Sorularınızı ekleyin." },
-                { step: "02", title: "Paylaşın", desc: "QR kodu veya linki katılımcılarla paylaşın. Giriş yapmalarına gerek yok." },
-                { step: "03", title: "Takip Edin", desc: "Canlı sonuçları izleyin. Analiz raporlarını indirin." }
+                { step: "01", title: t("landing.step1Title"), desc: t("landing.step1Desc") },
+                { step: "02", title: t("landing.step2Title"), desc: t("landing.step2Desc") },
+                { step: "03", title: t("landing.step3Title"), desc: t("landing.step3Desc") }
               ].map((item, index) => (
                 <div key={index} className="relative">
                   <div className="text-7xl sm:text-8xl font-black text-white/5 absolute -top-4 -left-2">{item.step}</div>
@@ -214,7 +208,7 @@ const LandingPage = ({ onLogin }) => {
         </section >
 
         {/* CTA Section */}
-        < section className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 lg:px-8" >
+        <section className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 lg:px-8" >
           <div className="max-w-4xl mx-auto">
             <div className="relative bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-8 sm:p-12 lg:p-16 text-center overflow-hidden">
               {/* Background decoration */}
@@ -223,11 +217,10 @@ const LandingPage = ({ onLogin }) => {
 
               <div className="relative z-10">
                 <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black mb-4 sm:mb-6">
-                  Hemen Ücretsiz Başlayın
+                  {t("landing.ctaTitle")}
                 </h2>
                 <p className="text-lg text-indigo-100 max-w-2xl mx-auto mb-8 sm:mb-10">
-                  Kredi kartı gerektirmez. Sınırsız yarışma, anket ve quiz oluşturun.
-                  Binlerce kullanıcı zaten Open Quiz ile etkileşimli etkinlikler düzenliyor.
+                  {t("landing.ctaDescription")}
                 </p>
 
                 <button
@@ -240,7 +233,7 @@ const LandingPage = ({ onLogin }) => {
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                   </svg>
-                  Google ile Giriş Yap
+                  {t("landing.ctaGoogleLogin")}
                   <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               </div>
@@ -248,7 +241,6 @@ const LandingPage = ({ onLogin }) => {
           </div>
         </section >
 
-        {/* Footer */}
         {/* Footer */}
         <footer className="relative z-10 border-t border-white/10 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -258,7 +250,7 @@ const LandingPage = ({ onLogin }) => {
               </div>
               <span className="font-bold">OpenQuiz</span>
             </div>
-            <p className="text-slate-500 text-sm">© 2025 Open Quiz. Tüm hakları saklıdır.</p>
+            <p className="text-slate-500 text-sm">{t("landing.footer")}</p>
           </div>
         </footer>
       </div>

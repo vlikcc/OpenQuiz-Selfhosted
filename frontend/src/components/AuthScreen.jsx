@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Trophy, Mail, Lock, User, ArrowRight, Loader2, Eye, EyeOff, KeyRound, CheckCircle, ArrowLeft } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { GOOGLE_CLIENT_ID } from '../config/constants';
+import { useTranslation } from 'react-i18next';
 
 const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordReset, isLoading: authLoading, onBack }) => {
+  const { t } = useTranslation();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,30 +22,30 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
     setError('');
     setSuccessMessage('');
 
-    if (!email) return setError('Email gerekli');
+    if (!email) return setError(t('auth.emailRequired'));
 
     if (mode === 'reset') {
       setIsSubmitting(true);
       try {
         await onPasswordReset(email);
-        setSuccessMessage('Şifre sıfırlama linki email adresinize gönderildi (yapılandırılmışsa).');
+        setSuccessMessage(t('auth.resetSent'));
       } catch (err) {
-        setError(err.message || 'Bir hata oluştu');
+        setError(err.message || t('common.error'));
       } finally {
         setIsSubmitting(false);
       }
       return;
     }
 
-    if (!password) return setError('Şifre gerekli');
-    if (password.length < 8) return setError('Şifre en az 8 karakter olmalı');
+    if (!password) return setError(t('auth.passwordRequired'));
+    if (password.length < 8) return setError(t('auth.passwordTooShort'));
 
     setIsSubmitting(true);
     try {
       if (mode === 'login') await onEmailLogin(email, password);
       else await onEmailRegister(email, password, displayName || email);
     } catch (err) {
-      setError(err.message || 'Bir hata oluştu');
+      setError(err.message || t('common.error'));
     } finally {
       setIsSubmitting(false);
     }
@@ -54,7 +56,7 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
       <div className="bg-white max-w-md w-full p-8 rounded-3xl shadow-2xl">
         {onBack && (
           <button onClick={onBack} className="mb-4 text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm">
-            <ArrowLeft size={16} /> Geri
+            <ArrowLeft size={16} /> {t('common.back')}
           </button>
         )}
 
@@ -63,14 +65,14 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
             <Trophy size={32} />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {mode === 'login' && 'Giriş Yap'}
-            {mode === 'register' && 'Kayıt Ol'}
-            {mode === 'reset' && 'Şifre Sıfırla'}
+            {mode === 'login' && t('auth.loginTitle')}
+            {mode === 'register' && t('auth.registerTitle')}
+            {mode === 'reset' && t('auth.resetTitle')}
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            {mode === 'login' && 'Devam etmek için giriş yapın.'}
-            {mode === 'register' && 'Yeni bir hesap oluşturun.'}
-            {mode === 'reset' && 'Email adresinize sıfırlama linki gönderelim.'}
+            {mode === 'login' && t('auth.loginSubtitle')}
+            {mode === 'register' && t('auth.registerSubtitle')}
+            {mode === 'reset' && t('auth.resetSubtitle')}
           </p>
         </div>
 
@@ -84,10 +86,10 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
                 setIsSubmitting(true);
                 setError('');
                 try { await onGoogleLogin(cred.credential); }
-                catch (err) { setError(err.message || 'Google ile giriş başarısız'); }
+                catch (err) { setError(err.message || t('auth.googleFailed')); }
                 finally { setIsSubmitting(false); }
               }}
-              onError={() => setError('Google ile giriş başarısız')}
+              onError={() => setError(t('auth.googleFailed'))}
             />
           </div>
         )}
@@ -95,7 +97,7 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
         {mode !== 'reset' && (
           <div className="flex items-center gap-3 my-4 text-slate-400 text-xs">
             <div className="h-px bg-slate-200 flex-1" />
-            VEYA
+            {t('auth.or')}
             <div className="h-px bg-slate-200 flex-1" />
           </div>
         )}
@@ -108,7 +110,7 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
-                placeholder="Adınız"
+                placeholder={t('auth.name')}
               />
             </div>
           )}
@@ -120,7 +122,7 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
-              placeholder="Email"
+              placeholder={t('auth.email')}
               required
             />
           </div>
@@ -133,7 +135,7 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-xl outline-none focus:border-indigo-500"
-                placeholder="Şifre"
+                placeholder={t('auth.password')}
                 required
                 minLength={8}
               />
@@ -160,9 +162,9 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
             className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLoading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
-            {mode === 'login' && 'Giriş Yap'}
-            {mode === 'register' && 'Kayıt Ol'}
-            {mode === 'reset' && 'Bağlantı Gönder'}
+            {mode === 'login' && t('auth.loginTitle')}
+            {mode === 'register' && t('auth.registerTitle')}
+            {mode === 'reset' && t('auth.sendLink')}
           </button>
         </form>
 
@@ -170,21 +172,21 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
           {mode === 'login' && (
             <>
               <div>
-                Hesabınız yok mu?{' '}
-                <button className="text-indigo-600 hover:underline" onClick={() => setMode('register')}>Kayıt olun</button>
+                {t('auth.noAccount')}{' '}
+                <button className="text-indigo-600 hover:underline" onClick={() => setMode('register')}>{t('auth.register')}</button>
               </div>
               <div>
                 <button className="text-indigo-600 hover:underline inline-flex items-center gap-1" onClick={() => setMode('reset')}>
-                  <KeyRound size={14} /> Şifremi unuttum
+                  <KeyRound size={14} /> {t('auth.forgotPassword')}
                 </button>
               </div>
             </>
           )}
           {mode === 'register' && (
-            <button className="text-indigo-600 hover:underline" onClick={() => setMode('login')}>Zaten hesabım var</button>
+            <button className="text-indigo-600 hover:underline" onClick={() => setMode('login')}>{t('auth.haveAccount')}</button>
           )}
           {mode === 'reset' && (
-            <button className="text-indigo-600 hover:underline" onClick={() => setMode('login')}>Giriş ekranına dön</button>
+            <button className="text-indigo-600 hover:underline" onClick={() => setMode('login')}>{t('auth.backToLogin')}</button>
           )}
         </div>
       </div>

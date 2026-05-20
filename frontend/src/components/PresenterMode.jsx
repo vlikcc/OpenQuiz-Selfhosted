@@ -6,11 +6,13 @@ import { pollService } from '../services/pollService';
 import { voteService } from '../services/voteService';
 import { wordcloudService } from '../services/wordcloudService';
 import { realtimeService } from '../services/realtimeService';
+import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import KatexRenderer from './KatexRenderer';
 import WordCloudCanvas from './wordcloud/WordCloudCanvas';
 
 export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToast }) {
+  const { t } = useTranslation();
   const [poll, setPoll] = useState(null);
   const [aggregates, setAggregates] = useState([]);
   const [openAnswers, setOpenAnswers] = useState([]);
@@ -19,6 +21,8 @@ export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToa
   const [activeTab, setActiveTab] = useState('chart');
   const [floatingReactions, setFloatingReactions] = useState([]);
   const reactionIdRef = useRef(0);
+
+  const ct = (key) => t(`contentTypes.${key}.label`);
 
   useEffect(() => {
     if (!pollId) return;
@@ -86,10 +90,10 @@ export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToa
   const isWordCloud = qTypeKey === 'wordcloud';
   const isOpen = qTypeKey === 'open';
 
-  const handleActivate = async () => { try { setPoll(await pollService.activate(pollId)); showToast('Yarışma başladı'); } catch (e) { showToast(e.message, 'error'); } };
+  const handleActivate = async () => { try { setPoll(await pollService.activate(pollId)); showToast(t('presenter.started')); } catch (e) { showToast(e.message, 'error'); } };
   const handleNext = async () => { try { setPoll(await pollService.nextQuestion(pollId)); } catch (e) { showToast(e.message, 'error'); } };
   const handlePrev = async () => { try { setPoll(await pollService.prevQuestion(pollId)); } catch (e) { showToast(e.message, 'error'); } };
-  const handleEnd = async () => { try { setPoll(await pollService.end(pollId)); showToast('Yarışma sonlandı'); } catch (e) { showToast(e.message, 'error'); } };
+  const handleEnd = async () => { try { setPoll(await pollService.end(pollId)); showToast(t('presenter.ended')); } catch (e) { showToast(e.message, 'error'); } };
 
   return (
     <div className="h-full w-full flex flex-col bg-gradient-to-br from-slate-900 to-indigo-900 text-white overflow-hidden">
@@ -100,7 +104,7 @@ export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToa
           <button onClick={onExit} className="p-2 hover:bg-white/10 rounded-lg"><Home size={20} /></button>
           <div>
             <h1 className="font-bold">{poll.title}</h1>
-            <p className="text-xs text-white/60">{typeCfg.icon} {typeCfg.label}</p>
+            <p className="text-xs text-white/60">{typeCfg.icon} {ct(typeKey)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -114,24 +118,24 @@ export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToa
       <div className="flex-1 overflow-y-auto p-6">
         {statusKey === 'waiting' && (
           <div className="max-w-2xl mx-auto text-center p-10">
-            <h2 className="text-3xl font-bold mb-4">Bekleme Odası</h2>
-            <p className="text-white/70 mb-6">{poll.participantCount || 0} kişi katıldı.</p>
-            <button onClick={handleActivate} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold flex items-center gap-2 mx-auto"><Play size={20} /> Yarışmayı Başlat</button>
+            <h2 className="text-3xl font-bold mb-4">{t('presenter.waitingRoomTitle')}</h2>
+            <p className="text-white/70 mb-6">{t('presenter.peopleJoined', { count: poll.participantCount || 0 })}</p>
+            <button onClick={handleActivate} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold flex items-center gap-2 mx-auto"><Play size={20} /> {t('presenter.startContest')}</button>
           </div>
         )}
 
         {statusKey !== 'waiting' && currentQ && (
           <div className="max-w-5xl mx-auto">
             <div className="mb-6">
-              <div className="text-sm text-white/50 mb-2">Soru {(poll.currentQuestionIndex || 0) + 1} / {poll.questions.length}</div>
+              <div className="text-sm text-white/50 mb-2">{t('presenter.questionOf', { current: (poll.currentQuestionIndex || 0) + 1, total: poll.questions.length })}</div>
               <h2 className="text-3xl font-bold">
                 {typeKey === 'exam' && currentQ.text.includes('$') ? <KatexRenderer text={currentQ.text} /> : currentQ.text}
               </h2>
             </div>
 
             <div className="flex gap-2 mb-4">
-              <button onClick={() => setActiveTab('chart')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'chart' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><BarChart3 size={16} className="inline mr-1" /> Sonuçlar</button>
-              {isOpen && <button onClick={() => setActiveTab('open')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'open' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><MessageSquare size={16} className="inline mr-1" /> Cevaplar ({openAnswers.length})</button>}
+              <button onClick={() => setActiveTab('chart')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'chart' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><BarChart3 size={16} className="inline mr-1" /> {t('presenter.results')}</button>
+              {isOpen && <button onClick={() => setActiveTab('open')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'open' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><MessageSquare size={16} className="inline mr-1" /> {t('presenter.answers', { n: openAnswers.length })}</button>}
             </div>
 
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 min-h-[400px]">
@@ -145,7 +149,7 @@ export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToa
                       <div>{a.answerText}</div>
                     </li>
                   ))}
-                  {openAnswers.filter((a) => a.questionId === currentQ.id).length === 0 && <li className="text-white/40 italic">Henüz cevap yok.</li>}
+                  {openAnswers.filter((a) => a.questionId === currentQ.id).length === 0 && <li className="text-white/40 italic">{t('presenter.noAnswers')}</li>}
                 </ul>
               ) : (
                 <ResponsiveContainer width="100%" height={400}>
@@ -163,15 +167,15 @@ export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToa
             </div>
 
             <div className="flex justify-between mt-6">
-              <button onClick={handlePrev} disabled={(poll.currentQuestionIndex || 0) === 0} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg disabled:opacity-30 flex items-center gap-1"><ChevronLeft size={16} /> Önceki</button>
+              <button onClick={handlePrev} disabled={(poll.currentQuestionIndex || 0) === 0} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg disabled:opacity-30 flex items-center gap-1"><ChevronLeft size={16} /> {t('presenter.prev')}</button>
               {statusKey === 'live' ? (
                 <button onClick={handleNext} className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 rounded-lg font-bold flex items-center gap-2">
-                  {(poll.currentQuestionIndex || 0) === poll.questions.length - 1 ? 'Sonlandır' : 'Sonraki Soru'} <ChevronRight size={16} />
+                  {(poll.currentQuestionIndex || 0) === poll.questions.length - 1 ? t('presenter.end') : t('presenter.next')} <ChevronRight size={16} />
                 </button>
               ) : (
-                <button onClick={onExit} className="px-6 py-3 bg-slate-600 hover:bg-slate-700 rounded-lg font-bold">Bitti — Geri Dön</button>
+                <button onClick={onExit} className="px-6 py-3 bg-slate-600 hover:bg-slate-700 rounded-lg font-bold">{t('presenter.doneBack')}</button>
               )}
-              {statusKey === 'live' && <button onClick={handleEnd} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg flex items-center gap-1"><Square size={14} /> Bitir</button>}
+              {statusKey === 'live' && <button onClick={handleEnd} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg flex items-center gap-1"><Square size={14} /> {t('presenter.endButton')}</button>}
             </div>
           </div>
         )}

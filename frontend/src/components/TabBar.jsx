@@ -1,11 +1,13 @@
 import React from 'react';
 import { Home, PlusCircle, User, Trophy } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const TabBar = ({ activeTab, onTabChange, isAdmin }) => {
+    const { t } = useTranslation();
     const tabs = [
-        { id: 'dashboard', label: 'Ana Sayfa', icon: Home },
-        { id: 'create', label: 'Oluştur', icon: PlusCircle },
-        { id: 'profile', label: 'Profil', icon: User },
+        { id: 'dashboard', label: t('tabs.dashboard'), icon: Home },
+        { id: 'create', label: t('tabs.create'), icon: PlusCircle },
+        { id: 'profile', label: t('tabs.profile'), icon: User },
     ];
 
     return (

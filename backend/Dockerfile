@@ -6,6 +6,7 @@ COPY src/OpenQuiz.Domain/OpenQuiz.Domain.csproj src/OpenQuiz.Domain/
 COPY src/OpenQuiz.Application/OpenQuiz.Application.csproj src/OpenQuiz.Application/
 COPY src/OpenQuiz.Infrastructure/OpenQuiz.Infrastructure.csproj src/OpenQuiz.Infrastructure/
 COPY src/OpenQuiz.Api/OpenQuiz.Api.csproj src/OpenQuiz.Api/
+COPY tools/OpenQuiz.DataImport/OpenQuiz.DataImport.csproj tools/OpenQuiz.DataImport/
 RUN dotnet restore OpenQuiz.slnx
 
 COPY . .

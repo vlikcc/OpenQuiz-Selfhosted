@@ -46,6 +46,11 @@ public partial class WordCloudService : IWordCloudService
             throw Errors.Validation("No valid terms after normalization.");
 
         var now = DateTime.UtcNow;
+        var termsList = normalizedTerms.Select(t => t.Normalized).Distinct().ToList();
+        var existingAggs = await _db.WordCloudAggregates
+            .Where(a => a.QuestionId == question.Id && termsList.Contains(a.Term))
+            .ToListAsync(ct);
+
         foreach (var (original, term) in normalizedTerms)
         {
             _db.WordCloudSubmissions.Add(new WordCloudSubmission
@@ -58,12 +63,17 @@ public partial class WordCloudService : IWordCloudService
                 CreatedAt = now
             });
 
-            var agg = await _db.WordCloudAggregates.FirstOrDefaultAsync(
-                a => a.QuestionId == question.Id && a.Term == term, ct);
+            var agg = existingAggs.FirstOrDefault(a => a.Term == term);
             if (agg is null)
-                _db.WordCloudAggregates.Add(new WordCloudAggregate { QuestionId = question.Id, Term = term, Count = 1 });
+            {
+                agg = new WordCloudAggregate { QuestionId = question.Id, Term = term, Count = 1 };
+                _db.WordCloudAggregates.Add(agg);
+                existingAggs.Add(agg);
+            }
             else
+            {
                 agg.Count++;
+            }
         }
         await _db.SaveChangesAsync(ct);
 

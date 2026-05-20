@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Shield, UserPlus, Users, Mail, Plus, Trash2, Loader2, UserCircle, Calendar, AlertTriangle } from 'lucide-react';
 import { userService } from '../services/userService';
+import { useTranslation } from 'react-i18next';
 
 export default function AdminPanel({ showToast }) {
+  const { t } = useTranslation();
   const [newEmail, setNewEmail] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [authorizedUsers, setAuthorizedUsers] = useState([]);
@@ -17,7 +19,7 @@ export default function AdminPanel({ showToast }) {
       setAuthorizedUsers(auth);
       setRegisteredUsers(reg);
     } catch (e) {
-      showToast(e.message || 'Yüklenemedi', 'error');
+      showToast(e.message || t('admin.loadError'), 'error');
     } finally {
       setLoading(false);
     }
@@ -28,29 +30,29 @@ export default function AdminPanel({ showToast }) {
   const handleAddUser = async (e) => {
     e.preventDefault();
     const email = newEmail.trim().toLowerCase();
-    if (!email || !email.includes('@')) return showToast('Geçerli bir email girin', 'error');
+    if (!email || !email.includes('@')) return showToast(t('admin.invalidEmail'), 'error');
 
     setIsAdding(true);
     try {
       await userService.addAuthorized(email);
       setNewEmail('');
-      showToast('Kullanıcı yetkilendirildi!');
+      showToast(t('admin.userAuthorized'));
       await refresh();
     } catch (err) {
-      showToast(err.message || 'Hata oluştu', 'error');
+      showToast(err.message || t('common.errorOccurred'), 'error');
     } finally {
       setIsAdding(false);
     }
   };
 
   const handleRemove = async (email) => {
-    if (!confirm(`${email} silinecek. Emin misiniz?`)) return;
+    if (!confirm(t('admin.confirmRemove', { email }))) return;
     try {
       await userService.removeAuthorized(email);
-      showToast('Yetki kaldırıldı');
+      showToast(t('admin.removed'));
       await refresh();
     } catch (err) {
-      showToast(err.message || 'Hata oluştu', 'error');
+      showToast(err.message || t('common.errorOccurred'), 'error');
     }
   };
 
@@ -58,7 +60,7 @@ export default function AdminPanel({ showToast }) {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center gap-2 mb-6">
         <Shield className="text-indigo-600" />
-        <h2 className="text-xl font-bold">Admin Paneli</h2>
+        <h2 className="text-xl font-bold">{t('admin.title')}</h2>
       </div>
 
       <div className="flex gap-2 mb-6">
@@ -66,13 +68,13 @@ export default function AdminPanel({ showToast }) {
           onClick={() => setActiveSection('authorized')}
           className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 ${activeSection === 'authorized' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-400'}`}
         >
-          <UserPlus size={16} /> Yetkili Kullanıcılar ({authorizedUsers.length})
+          <UserPlus size={16} /> {t('admin.authorizedTab', { n: authorizedUsers.length })}
         </button>
         <button
           onClick={() => setActiveSection('registered')}
           className={`px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 ${activeSection === 'registered' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:border-indigo-400'}`}
         >
-          <Users size={16} /> Kayıtlı Kullanıcılar ({registeredUsers.length})
+          <Users size={16} /> {t('admin.registeredTab', { n: registeredUsers.length })}
         </button>
       </div>
 
@@ -86,14 +88,14 @@ export default function AdminPanel({ showToast }) {
               <input
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="kullanici@ornek.com"
+                placeholder={t('admin.addPlaceholder')}
                 type="email"
                 className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg outline-none focus:border-indigo-500"
               />
             </div>
             <button type="submit" disabled={isAdding} className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-1 disabled:opacity-50">
               {isAdding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              Ekle
+              {t('admin.add')}
             </button>
           </form>
 
@@ -105,7 +107,7 @@ export default function AdminPanel({ showToast }) {
                   <div>
                     <div className="font-medium text-slate-800">{u.email}</div>
                     <div className="text-xs text-slate-400 flex items-center gap-1">
-                      <Calendar size={12} /> {new Date(u.addedAt).toLocaleDateString('tr-TR')}
+                      <Calendar size={12} /> {new Date(u.addedAt).toLocaleDateString()}
                     </div>
                   </div>
                 </div>
@@ -117,7 +119,7 @@ export default function AdminPanel({ showToast }) {
             {authorizedUsers.length === 0 && (
               <li className="text-center text-slate-400 py-6 flex flex-col items-center gap-2">
                 <AlertTriangle size={20} />
-                Henüz yetkili kullanıcı yok.
+                {t('admin.emptyAuthorized')}
               </li>
             )}
           </ul>
@@ -134,17 +136,17 @@ export default function AdminPanel({ showToast }) {
                   <div className="font-medium text-slate-800">{u.displayName || u.email}</div>
                   <div className="text-xs text-slate-500">{u.email}</div>
                   <div className="text-xs text-slate-400 flex items-center gap-1">
-                    <Calendar size={12} /> {new Date(u.createdAt).toLocaleDateString('tr-TR')}
+                    <Calendar size={12} /> {new Date(u.createdAt).toLocaleDateString()}
                   </div>
                 </div>
               </div>
               {u.canCreate && (
-                <span className="text-xs font-bold uppercase px-2 py-1 rounded bg-emerald-100 text-emerald-700">Yetkili</span>
+                <span className="text-xs font-bold uppercase px-2 py-1 rounded bg-emerald-100 text-emerald-700">{t('admin.authorizedBadge')}</span>
               )}
             </li>
           ))}
           {registeredUsers.length === 0 && (
-            <li className="text-center text-slate-400 py-6">Henüz kayıtlı kullanıcı yok.</li>
+            <li className="text-center text-slate-400 py-6">{t('admin.emptyRegistered')}</li>
           )}
         </ul>
       )}

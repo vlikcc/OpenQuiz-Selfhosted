@@ -90,10 +90,9 @@ public class VoteService : IVoteService
 
         await _db.SaveChangesAsync(ct);
 
-        // Recompute aggregate for this question and notify (Phase 3.5 will add throttling).
-        var aggregates = await AggregatesAsync(pollId, ct);
-        var thisQ = aggregates.ElementAtOrDefault(req.QuestionIndex);
-        if (thisQ is not null) await _realtime.VoteCountsUpdatedAsync(pollId, thisQ);
+        // Recompute aggregate for this question and notify.
+        var thisQ = await SingleQuestionAggregateAsync(poll.Id, question.Id, req.QuestionIndex, ct);
+        await _realtime.VoteCountsUpdatedAsync(pollId, thisQ);
 
         return new VoteDto(vote.Id, vote.QuestionId, vote.UserName, req.SelectedIndices,
             vote.IsCorrect, vote.ResponseTimeMs, vote.CreatedAt);
@@ -177,6 +176,24 @@ public class VoteService : IVoteService
         var creatorId = _db.Polls.Where(p => p.Id == pollId).Select(p => (Guid?)p.CreatorId).FirstOrDefault();
         if (creatorId is null) throw Errors.NotFound("Poll");
         if (_user.UserId != creatorId) throw Errors.Forbidden();
+    }
+
+    private async Task<QuestionAggregate> SingleQuestionAggregateAsync(Guid pollId, Guid questionId, int questionIndex, CancellationToken ct)
+    {
+        var votes = await _db.Votes.AsNoTracking()
+            .Where(v => v.QuestionId == questionId)
+            .Select(v => new { v.UserName, v.SelectedOptionIndices })
+            .ToListAsync(ct);
+
+        var counts = new Dictionary<int, int>();
+        foreach (var v in votes)
+        {
+            foreach (var idx in ParseIndices(v.SelectedOptionIndices))
+                counts[idx] = counts.GetValueOrDefault(idx) + 1;
+        }
+
+        var distinctUserCount = votes.Select(v => v.UserName).Distinct().Count();
+        return new QuestionAggregate(questionIndex, questionId, distinctUserCount, counts);
     }
 
     private static List<int> ParseIndices(string json)

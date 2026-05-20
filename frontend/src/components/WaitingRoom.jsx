@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Users, Loader2, Clock, Trophy } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_KEY } from '../config/constants';
+import { useTranslation } from 'react-i18next';
 
 export default function WaitingRoom({ poll, participantCount, userName }) {
+    const { t } = useTranslation();
     const [dots, setDots] = useState('');
 
     const typeKey = poll ? (typeof poll.type === 'number' ? POLL_TYPE_KEY[poll.type] : poll.type) : null;
     const typeConfig = typeKey ? CONTENT_TYPES[typeKey] : null;
+    const ct = (key) => t(`contentTypes.${key}.label`);
 
     // Animasyonlu üç nokta
     useEffect(() => {
@@ -34,14 +37,16 @@ export default function WaitingRoom({ poll, participantCount, userName }) {
             {/* Başlık */}
             <h1 className="text-2xl font-bold text-center mb-2">{poll.title}</h1>
             <p className="text-white/70 text-center mb-8">
-                {typeConfig?.label || 'Yarışma'}
+                {typeKey ? ct(typeKey) : t('contentTypes.contest.label')}
             </p>
 
             {/* Hoşgeldin Mesajı */}
             {userName && (
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-3 mb-6">
                     <p className="text-lg">
-                        Hoş geldin, <span className="font-bold text-yellow-300">{userName}</span>! 👋
+                        {t('waiting.welcome', { name: '' }).split('{{name}}')[0]}
+                        <span className="font-bold text-yellow-300">{userName}</span>
+                        ! 👋
                     </p>
                 </div>
             )}
@@ -53,7 +58,7 @@ export default function WaitingRoom({ poll, participantCount, userName }) {
                 </div>
                 <div>
                     <p className="text-3xl font-black">{participantCount || 0}</p>
-                    <p className="text-white/70 text-sm">katılımcı bekleniyor</p>
+                    <p className="text-white/70 text-sm">{t('waiting.waiting')}</p>
                 </div>
             </div>
 
@@ -61,10 +66,10 @@ export default function WaitingRoom({ poll, participantCount, userName }) {
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-8 py-6 text-center max-w-sm">
                 <div className="flex items-center justify-center gap-2 mb-3">
                     <Clock size={20} className="text-yellow-300" />
-                    <span className="font-semibold">Yönetici bekleniyor{dots}</span>
+                    <span className="font-semibold">{t('waiting.managerWaiting')}{dots}</span>
                 </div>
                 <p className="text-white/70 text-sm">
-                    Yarışma yönetici tarafından başlatıldığında sorular otomatik olarak görünecek.
+                    {t('waiting.managerHint')}
                 </p>
             </div>
 
@@ -72,7 +77,7 @@ export default function WaitingRoom({ poll, participantCount, userName }) {
             {poll.questions && (
                 <div className="mt-6 text-white/50 text-sm flex items-center gap-2">
                     <Trophy size={16} />
-                    <span>{poll.questions.length} soru hazırlandı</span>
+                    <span>{t('waiting.preparedCount', { n: poll.questions.length })}</span>
                 </div>
             )}
 
