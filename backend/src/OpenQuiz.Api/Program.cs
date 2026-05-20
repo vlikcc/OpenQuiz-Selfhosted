@@ -1,6 +1,10 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using OpenQuiz.Api.Auth;
+using OpenQuiz.Api.Middleware;
+using OpenQuiz.Application;
+using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Infrastructure;
 using OpenQuiz.Infrastructure.Options;
 using Serilog;
@@ -15,6 +19,10 @@ builder.Host.UseSerilog((ctx, lc) => lc
 
 // --- Services ---
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddApplication();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -64,6 +72,7 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
 var app = builder.Build();
 
 app.UseSerilogRequestLogging();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {

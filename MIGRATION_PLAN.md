@@ -634,11 +634,11 @@ d3-cloud (+ d3-scale, d3-selection)
 | Şu anki Firestore verileri | Veri kaybı | Self-hosted **yeni başlangıçtır**; eski veri import gerekirse Faz 8 sonrası ayrı script |
 | Google OAuth client'ın native'de farklı client_id gerektirmesi | Mobil giriş çalışmaz | Mobil çıkana kadar tek "Web" client_id kullanılır |
 
-### Açık Karar Noktaları (kullanıcıdan netlik istenebilecek)
-1. **Mobil shell:** Capacitor kalsın mı kaldırılsın mı? (öneri: ilk sürümde kaldır)
-2. **Şifre sıfırlama:** SMTP entegrasyonu mı, admin manuel reset linki mi? (öneri: ilk sürümde SMTP opsiyonel — yoksa endpoint 501 döner)
-3. **Çoklu dil:** Mevcut UI tamamen Türkçe. EN desteği eklenecek mi? (öneri: hayır, kapsam dışı)
-4. **Veri migration:** Eski Firestore verilerini yeni MSSQL'e taşıyacak bir script gerekiyor mu? (öneri: hayır, sıfırdan başlasın)
+### Karar Noktaları
+1. **Mobil shell:** ❌ **Kaldırıldı** (2026-05-20). İlk sürüm sadece web. Capacitor paketleri ve native dizinler frontend migration fazında silinecek.
+2. **Şifre sıfırlama:** ✅ **SMTP entegrasyonu** (2026-05-20). MailKit kullanılacak. `PasswordResetTokens` tablosu + `SmtpOptions` (Host/Port/User/Password/From/UseStartTls) eklenecek. Endpoint'ler: `POST /api/auth/password-reset/request` ve `POST /api/auth/password-reset/confirm`. SMTP yapılandırılmamışsa endpoint 503 döner ve loglar.
+3. **Çoklu dil:** Açık (öneri: hayır, kapsam dışı).
+4. **Veri migration:** Açık (öneri: hayır, sıfırdan başlasın).
 
 ---
 

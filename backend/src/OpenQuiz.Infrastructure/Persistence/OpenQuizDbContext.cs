@@ -18,6 +18,7 @@ public class OpenQuizDbContext : DbContext
     public DbSet<WordCloudAggregate> WordCloudAggregates => Set<WordCloudAggregate>();
     public DbSet<Score> Scores => Set<Score>();
     public DbSet<Reaction> Reactions => Set<Reaction>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
