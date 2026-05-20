@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
 using OpenQuiz.Api.Auth;
 using OpenQuiz.Api.Hubs;
 using OpenQuiz.Api.Middleware;
@@ -9,6 +10,7 @@ using OpenQuiz.Application;
 using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Infrastructure;
 using OpenQuiz.Infrastructure.Options;
+using OpenQuiz.Infrastructure.Persistence;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -89,6 +91,23 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
 
 // --- Pipeline ---
 var app = builder.Build();
+
+// Apply pending EF Core migrations on startup (self-hosted convenience).
+if (builder.Configuration.GetValue("App:AutoMigrate", true))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<OpenQuizDbContext>();
+    var attempts = 0;
+    while (true)
+    {
+        try { await db.Database.MigrateAsync(); break; }
+        catch (Exception ex) when (++attempts < 20)
+        {
+            app.Logger.LogWarning(ex, "Database not ready yet (attempt {Attempt}/20), retrying in 3 s…", attempts);
+            await Task.Delay(3000);
+        }
+    }
+}
 
 app.UseSerilogRequestLogging();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
