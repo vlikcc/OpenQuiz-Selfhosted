@@ -13,6 +13,7 @@ public class PollService : IPollService
 {
     private readonly OpenQuizDbContext _db;
     private readonly ICurrentUser _user;
+    private readonly IRealtimeNotifier _realtime;
     private readonly IValidator<CreatePollRequest> _createValidator;
     private readonly IValidator<UpdatePollRequest> _updateValidator;
     private readonly IValidator<JoinPollRequest> _joinValidator;
@@ -20,11 +21,12 @@ public class PollService : IPollService
     public PollService(
         OpenQuizDbContext db,
         ICurrentUser user,
+        IRealtimeNotifier realtime,
         IValidator<CreatePollRequest> cv,
         IValidator<UpdatePollRequest> uv,
         IValidator<JoinPollRequest> jv)
     {
-        _db = db; _user = user;
+        _db = db; _user = user; _realtime = realtime;
         _createValidator = cv; _updateValidator = uv; _joinValidator = jv;
     }
 
@@ -147,7 +149,9 @@ public class PollService : IPollService
 
         poll.ParticipantCount++;
         await _db.SaveChangesAsync(ct);
-        return (await GetAsync(id, ct))!;
+        var dto = (await GetAsync(id, ct))!;
+        await _realtime.PollUpdatedAsync(id, dto);
+        return dto;
     }
 
     private async Task<PollDto> TransitionAsync(Guid id, Action<Poll> mutate, CancellationToken ct)
@@ -159,7 +163,9 @@ public class PollService : IPollService
         mutate(poll);
         poll.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
-        return (await GetAsync(id, ct))!;
+        var dto = (await GetAsync(id, ct))!;
+        await _realtime.PollUpdatedAsync(id, dto);
+        return dto;
     }
 
     private void EnsureOwner(Poll poll)

@@ -14,16 +14,18 @@ public class VoteService : IVoteService
 {
     private readonly OpenQuizDbContext _db;
     private readonly ICurrentUser _user;
+    private readonly IRealtimeNotifier _realtime;
     private readonly IValidator<SubmitVoteRequest> _vv;
     private readonly IValidator<SubmitOpenAnswerRequest> _ov;
 
     public VoteService(
         OpenQuizDbContext db,
         ICurrentUser user,
+        IRealtimeNotifier realtime,
         IValidator<SubmitVoteRequest> vv,
         IValidator<SubmitOpenAnswerRequest> ov)
     {
-        _db = db; _user = user; _vv = vv; _ov = ov;
+        _db = db; _user = user; _realtime = realtime; _vv = vv; _ov = ov;
     }
 
     public async Task<VoteDto> SubmitAsync(Guid pollId, SubmitVoteRequest req, CancellationToken ct)
@@ -88,6 +90,11 @@ public class VoteService : IVoteService
 
         await _db.SaveChangesAsync(ct);
 
+        // Recompute aggregate for this question and notify (Phase 3.5 will add throttling).
+        var aggregates = await AggregatesAsync(pollId, ct);
+        var thisQ = aggregates.ElementAtOrDefault(req.QuestionIndex);
+        if (thisQ is not null) await _realtime.VoteCountsUpdatedAsync(pollId, thisQ);
+
         return new VoteDto(vote.Id, vote.QuestionId, vote.UserName, req.SelectedIndices,
             vote.IsCorrect, vote.ResponseTimeMs, vote.CreatedAt);
     }
@@ -115,6 +122,7 @@ public class VoteService : IVoteService
         };
         _db.OpenAnswers.Add(entity);
         await _db.SaveChangesAsync(ct);
+        await _realtime.OpenAnswerSubmittedAsync(pollId, req.QuestionIndex, entity.UserName);
 
         return new OpenAnswerDto(entity.Id, entity.QuestionId, entity.UserName, entity.AnswerText, entity.Score, entity.CreatedAt);
     }

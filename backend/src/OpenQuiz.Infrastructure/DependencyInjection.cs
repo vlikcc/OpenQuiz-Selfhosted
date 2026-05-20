@@ -35,6 +35,8 @@ public static class DependencyInjection
         services.AddScoped<IVoteService, VoteService>();
         services.AddScoped<IScoreService, ScoreService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IWordCloudService, WordCloudService>();
+        services.AddScoped<IReactionService, ReactionService>();
 
         return services;
     }

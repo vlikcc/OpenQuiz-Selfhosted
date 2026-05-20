@@ -2,7 +2,9 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using OpenQuiz.Api.Auth;
+using OpenQuiz.Api.Hubs;
 using OpenQuiz.Api.Middleware;
+using OpenQuiz.Api.Realtime;
 using OpenQuiz.Application;
 using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Infrastructure;
@@ -27,6 +29,10 @@ builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
+builder.Services.AddSignalR();
+
+builder.Services.AddSingleton<RealtimeThrottle>();
+builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
 
 // --- AuthN/AuthZ ---
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
@@ -53,6 +59,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwt.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
             ClockSkew = TimeSpan.FromSeconds(30)
+        };
+
+        // Allow JWT via query string for SignalR WebSocket handshake.
+        opts.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                var accessToken = ctx.Request.Query["access_token"];
+                var path = ctx.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    ctx.Token = accessToken;
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -85,6 +104,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+app.MapHub<PollHub>("/hubs/poll");
 
 app.Run();
 
