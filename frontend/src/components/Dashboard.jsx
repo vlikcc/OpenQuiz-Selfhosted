@@ -213,7 +213,7 @@ export default function Dashboard({ onNavigate, user, showToast, isAdmin, isAuth
                     else setQuestions([blankMultiple()]);
                     setIsCreating(true);
                   }}
-                  className={`bg-${cfg.color}-600 hover:bg-${cfg.color}-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 shadow-lg text-xs sm:text-sm`}
+                  className={`${cfg.classes.solid} text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 shadow-lg text-xs sm:text-sm`}
                 >
                   <span>{cfg.icon}</span> {ct(key)}
                 </button>
@@ -377,7 +377,7 @@ export default function Dashboard({ onNavigate, user, showToast, isAdmin, isAuth
               </div>
               <div className="flex gap-4">
                 <button type="button" onClick={resetForm} className="py-3 px-6 text-slate-500 hover:bg-slate-50 rounded-xl font-medium">{t('common.cancel')}</button>
-                <button onClick={handleCreateQuiz} className={`py-3 px-8 text-white rounded-xl font-bold shadow-lg bg-${CONTENT_TYPES[contentType].color}-600 hover:bg-${CONTENT_TYPES[contentType].color}-700`}>
+                <button onClick={handleCreateQuiz} className={`py-3 px-8 text-white rounded-xl font-bold shadow-lg ${CONTENT_TYPES[contentType].classes.solid}`}>
                   {CONTENT_TYPES[contentType].icon} {editingPollId ? t('common.update') : t('common.save')}
                 </button>
               </div>
@@ -394,14 +394,14 @@ export default function Dashboard({ onNavigate, user, showToast, isAdmin, isAuth
               return (
                 <div key={poll.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg flex flex-col group min-h-[220px]">
                   <div className="flex justify-between items-start mb-3">
-                    <div className={`bg-${cfg.color}-50 text-${cfg.color}-700 p-2 rounded-lg`}><span className="text-lg">{cfg.icon}</span></div>
+                    <div className={`${cfg.classes.soft} p-2 rounded-lg`}><span className="text-lg">{cfg.icon}</span></div>
                     <div className="flex gap-1">
                       <button onClick={() => setQrPoll(poll)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"><QrCode size={16} /></button>
                       {canDelete && <button onClick={() => handleDeletePoll(poll)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>}
                       {canDelete && <button onClick={() => handleEditPoll(poll)} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={16} /></button>}
                     </div>
                   </div>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-${cfg.color}-100 text-${cfg.color}-700 w-fit`}>{ct(tk)}</span>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${cfg.classes.badge} w-fit`}>{ct(tk)}</span>
                   <h3 className="text-base sm:text-lg font-bold mt-2 mb-2 line-clamp-2 text-slate-800">{poll.title || t('common.untitled')}</h3>
                   <p className="text-sm text-slate-500 mb-4 flex items-center gap-2">
                     <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-bold">{t('dashboard.questionCount', { count: poll.questions?.length || 0 })}</span>

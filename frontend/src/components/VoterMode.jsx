@@ -181,7 +181,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white max-w-sm w-full p-8 rounded-3xl shadow-xl text-center">
           <div className="text-5xl mb-4">{typeCfg.icon}</div>
-          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 bg-${typeCfg.color}-100 text-${typeCfg.color}-700`}>{ct(typeKey)}</span>
+          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 ${typeCfg.classes.badge}`}>{ct(typeKey)}</span>
           <h2 className="text-2xl font-bold mb-2">{poll.title}</h2>
           <p className="text-slate-500 text-sm mb-6">{poll.questions?.length || 0} {t('common.question')}</p>
           <form onSubmit={handleStart}>
