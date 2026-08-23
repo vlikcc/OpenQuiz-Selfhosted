@@ -1,12 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Trophy, Users, BarChart3, Download, FileSpreadsheet, FileText } from 'lucide-react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { voteService } from '../services/voteService';
 import { scoreService } from '../services/scoreService';
 import { CONTENT_TYPES, POLL_TYPE_KEY, QUESTION_TYPE_KEY } from '../config/constants';
+import { buildScoreReportPdf, buildScoreReportWorkbook, saveScoreReportPdf, saveScoreReportWorkbook } from '../utils/scoreReport';
 import { useTranslation } from 'react-i18next';
 
 const CHART_COLORS = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#3B82F6', '#EF4444', '#14B8A6'];
@@ -46,25 +44,19 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
     return { totalParticipants, questionAnalysis };
   }, [poll, aggregates]);
 
+  const reportLabels = {
+    user: t('results.pdfUser'),
+    score: t('results.pdfScore'),
+    time: t('results.pdfTime'),
+    sheet: t('results.sheetScores'),
+  };
+
   const handleExportPdf = () => {
-    const doc = new jsPDF();
-    doc.text(poll.title, 14, 16);
-    doc.autoTable({
-      head: [['#', t('results.pdfUser'), t('results.pdfScore'), t('results.pdfTime')]],
-      body: scores.map((s, i) => [i + 1, s.userName, s.points, s.totalTimeMs]),
-      startY: 24,
-    });
-    doc.save(`${poll.title || 'report'}.pdf`);
+    saveScoreReportPdf(buildScoreReportPdf(poll.title, scores, reportLabels), poll.title);
   };
 
   const handleExportExcel = () => {
-    const data = [
-      [t('results.pdfUser'), t('results.pdfScore'), t('results.pdfTime')],
-      ...scores.map((s) => [s.userName, s.points, s.totalTimeMs]),
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), t('results.sheetScores'));
-    XLSX.writeFile(wb, `${poll.title || 'report'}.xlsx`);
+    saveScoreReportWorkbook(buildScoreReportWorkbook(scores, reportLabels), poll.title);
   };
 
   if (!poll) return null;
@@ -85,6 +77,12 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
           <button onClick={() => setActiveTab('overview')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'overview' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><BarChart3 size={16} className="inline mr-1" /> {t('results.questionsTab')}</button>
           {typeConfig.hasCorrectAnswer && (
             <button onClick={() => setActiveTab('leaderboard')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'leaderboard' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><Trophy size={16} className="inline mr-1" /> {t('results.leaderboardTab')}</button>
+          )}
+          {activeTab === 'overview' && (
+            <div className="ml-auto flex gap-2">
+              <button onClick={() => setChartType('bar')} className={`px-3 py-2 rounded-lg text-sm ${chartType === 'bar' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>{t('results.barChart')}</button>
+              <button onClick={() => setChartType('pie')} className={`px-3 py-2 rounded-lg text-sm ${chartType === 'pie' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>{t('results.pieChart')}</button>
+            </div>
           )}
         </div>
 

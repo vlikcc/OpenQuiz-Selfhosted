@@ -43,6 +43,7 @@ Detailed instructions live in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
 │   │   ├── OpenQuiz.Application/  # DTOs, validators, abstractions
 │   │   ├── OpenQuiz.Infrastructure/ # EF Core, services, options, auth, SMTP
 │   │   └── OpenQuiz.Api/          # controllers, SignalR hub, middleware
+│   ├── tests/OpenQuiz.Api.Tests/  # integration tests over the real API + SQL Server
 │   └── Dockerfile
 ├── frontend/                      # React app
 │   ├── src/
@@ -56,8 +57,11 @@ Detailed instructions live in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
 │   ├── ARCHITECTURE.md
 │   ├── API.md
 │   └── SELF_HOSTING.md
+├── .github/workflows/ci.yml       # backend build + test, frontend lint + test + build
 ├── docker-compose.yml
 ├── .env.example
+├── CONTRIBUTING.md
+├── SECURITY.md
 ├── MIGRATION_PLAN.md              # the full plan that drove this rewrite
 └── README.md
 ```
@@ -96,6 +100,17 @@ npm install
 npm run dev
 # Vite dev server on http://localhost:5173
 ```
+
+## Tests
+
+```bash
+dotnet test backend/tests/OpenQuiz.Api.Tests/OpenQuiz.Api.Tests.csproj   # API against a real SQL Server
+cd frontend && npm test                                                  # Vitest + React Testing Library
+```
+
+The backend suite starts its own SQL Server through Testcontainers; set
+`OPENQUIZ_TEST_SQL` to reuse a server you already have. Both suites, plus lint
+and both builds, run on every pull request. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Documentation
 

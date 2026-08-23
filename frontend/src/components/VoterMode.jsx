@@ -11,14 +11,14 @@ import KatexRenderer from './KatexRenderer';
 import WaitingRoom from './WaitingRoom';
 import WordCloudVoter from './wordcloud/WordCloudVoter';
 
-export default function VoterMode({ pollId, onExit, user, showToast, preloadedPoll = null }) {
+export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
   const { t } = useTranslation();
   const [step, setStep] = useState('name');
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState(() => localStorage.getItem('voterName') ?? '');
   const [poll, setPoll] = useState(preloadedPoll);
   const [currentQIndex, setCurrentQIndex] = useState(preloadedPoll?.currentQuestionIndex ?? 0);
   const [hasVotedForCurrent, setHasVotedForCurrent] = useState(false);
-  const [startTime, setStartTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(() => Date.now());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const [openAnswer, setOpenAnswer] = useState('');
@@ -27,13 +27,16 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const votedQuestionsRef = useRef(new Set());
+  // The SignalR subscription below is created once per poll, so its handler
+  // cannot read `currentQIndex` from state without capturing a stale value.
+  const currentQIndexRef = useRef(currentQIndex);
+
+  const goToQuestion = useCallback((index) => {
+    currentQIndexRef.current = index;
+    setCurrentQIndex(index);
+  }, []);
 
   const ct = (key) => t(`contentTypes.${key}.label`);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('voterName');
-    if (saved) setUserName(saved);
-  }, []);
 
   // Initial load + SignalR subscription
   useEffect(() => {
@@ -43,7 +46,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     pollService.get(pollId).then((p) => {
       if (active && p) {
         setPoll(p);
-        setCurrentQIndex(p.currentQuestionIndex ?? 0);
+        goToQuestion(p.currentQuestionIndex ?? 0);
         const q = p.questions?.[p.currentQuestionIndex ?? 0];
         if (q) { setTimeLeft(q.timeLimit || 30); setIsTimerRunning(true); }
       }
@@ -54,10 +57,10 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
         if (!active) return;
         setPoll(p);
         const newQ = p.currentQuestionIndex ?? 0;
-        if (newQ !== currentQIndex) {
+        if (newQ !== currentQIndexRef.current) {
           const q = p.questions?.[newQ];
           if (q) { setTimeLeft(q.timeLimit || 30); setIsTimerRunning(true); }
-          setCurrentQIndex(newQ);
+          goToQuestion(newQ);
           const key = `${pollId}_${newQ}`;
           const voted = votedQuestionsRef.current.has(key);
           setHasVotedForCurrent(voted);
@@ -72,14 +75,12 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     });
 
     return () => { active = false; unsubP.then((u) => u && u()); };
-  }, [pollId]);
+  }, [pollId, goToQuestion]);
 
   useEffect(() => {
     let interval;
     if (isTimerRunning && timeLeft > 0 && !hasVotedForCurrent) {
       interval = setInterval(() => setTimeLeft((t) => t - 1), 1000);
-    } else if (timeLeft === 0) {
-      setIsTimerRunning(false);
     }
     return () => clearInterval(interval);
   }, [isTimerRunning, timeLeft, hasVotedForCurrent]);
@@ -95,25 +96,8 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     setStep('vote');
   }, [userName, pollId, isRegistered]);
 
-  const handleVote = useCallback((optionIndex) => {
-    const q = poll.questions[currentQIndex];
-    if (q.allowMultiple) {
-      if (hasVotedForCurrent) return;
-      setSelectedIndices((p) => p.includes(optionIndex) ? p.filter((i) => i !== optionIndex) : [...p, optionIndex]);
-      return;
-    }
-    if (isSubmitting || hasVotedForCurrent) return;
-    submitVote([optionIndex]);
-  }, [poll, currentQIndex, isSubmitting, hasVotedForCurrent]);
-
-  const handleSubmitMulti = () => {
-    if (selectedIndices.length === 0 || isSubmitting || hasVotedForCurrent) return;
-    submitVote(selectedIndices);
-  };
-
-  const submitVote = async (indices) => {
+  const submitVote = useCallback(async (indices) => {
     setIsSubmitting(true);
-    const q = poll.questions[currentQIndex];
     const typeKey = POLL_TYPE_KEY[poll.type] || 'contest';
     const typeCfg = CONTENT_TYPES[typeKey] || CONTENT_TYPES.contest;
 
@@ -133,6 +117,22 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     } finally {
       setIsSubmitting(false);
     }
+  }, [poll, pollId, currentQIndex, startTime, userName, showToast, t]);
+
+  const handleVote = useCallback((optionIndex) => {
+    const q = poll.questions[currentQIndex];
+    if (q.allowMultiple) {
+      if (hasVotedForCurrent) return;
+      setSelectedIndices((p) => p.includes(optionIndex) ? p.filter((i) => i !== optionIndex) : [...p, optionIndex]);
+      return;
+    }
+    if (isSubmitting || hasVotedForCurrent) return;
+    submitVote([optionIndex]);
+  }, [poll, currentQIndex, isSubmitting, hasVotedForCurrent, submitVote]);
+
+  const handleSubmitMulti = () => {
+    if (selectedIndices.length === 0 || isSubmitting || hasVotedForCurrent) return;
+    submitVote(selectedIndices);
   };
 
   const handleOpenAnswer = async () => {
@@ -181,7 +181,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white max-w-sm w-full p-8 rounded-3xl shadow-xl text-center">
           <div className="text-5xl mb-4">{typeCfg.icon}</div>
-          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 bg-${typeCfg.color}-100 text-${typeCfg.color}-700`}>{ct(typeKey)}</span>
+          <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 ${typeCfg.classes.badge}`}>{ct(typeKey)}</span>
           <h2 className="text-2xl font-bold mb-2">{poll.title}</h2>
           <p className="text-slate-500 text-sm mb-6">{poll.questions?.length || 0} {t('common.question')}</p>
           <form onSubmit={handleStart}>

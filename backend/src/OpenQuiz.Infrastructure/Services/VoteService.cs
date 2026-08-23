@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FluentValidation;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Application.Common;
@@ -36,16 +37,12 @@ public class VoteService : IVoteService
             .FirstOrDefaultAsync(p => p.Id == pollId, ct)
             ?? throw Errors.NotFound("Poll");
 
-        var question = poll.Questions.OrderBy(q => q.OrderIndex)
-            .ElementAtOrDefault(req.QuestionIndex)
-            ?? throw Errors.Validation("Question index out of range.");
+        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex);
 
-        // Per-user dedupe (logged-in)
-        if (_user.UserId is Guid uid)
-        {
-            var exists = await _db.Votes.AnyAsync(v => v.QuestionId == question.Id && v.UserId == uid, ct);
-            if (exists) throw Errors.Conflict("You have already voted on this question.");
-        }
+        var voterKey = VoterKeyFor(req.UserName);
+        var alreadyVoted = await _db.Votes
+            .AnyAsync(v => v.QuestionId == question.Id && v.VoterKey == voterKey, ct);
+        if (alreadyVoted) throw Errors.Conflict("You have already voted on this question.");
 
         bool? isCorrect = null;
         if ((poll.Type is PollType.Contest or PollType.Quiz or PollType.Exam) && question.CorrectOptionIndex.HasValue)
@@ -59,6 +56,7 @@ public class VoteService : IVoteService
             QuestionId = question.Id,
             UserId = _user.UserId,
             UserName = req.UserName.Trim(),
+            VoterKey = voterKey,
             SelectedOptionIndices = JsonSerializer.Serialize(req.SelectedIndices),
             IsCorrect = isCorrect,
             ResponseTimeMs = req.ResponseTimeMs,
@@ -88,7 +86,14 @@ public class VoteService : IVoteService
             }
         }
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        {
+            throw Errors.Conflict("You have already voted on this question.");
+        }
 
         // Recompute aggregate for this question and notify.
         var thisQ = await SingleQuestionAggregateAsync(poll.Id, question.Id, req.QuestionIndex, ct);
@@ -106,9 +111,7 @@ public class VoteService : IVoteService
             .FirstOrDefaultAsync(p => p.Id == pollId, ct)
             ?? throw Errors.NotFound("Poll");
 
-        var question = poll.Questions.OrderBy(q => q.OrderIndex)
-            .ElementAtOrDefault(req.QuestionIndex)
-            ?? throw Errors.Validation("Question index out of range.");
+        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex);
 
         var entity = new OpenAnswer
         {
@@ -167,6 +170,16 @@ public class VoteService : IVoteService
         }
         return result;
     }
+
+    // Signed-in voters are deduplicated on their account, anonymous ones on the
+    // name they joined under, which is the only identity they have.
+    private string VoterKeyFor(string userName) =>
+        _user.UserId is Guid uid
+            ? $"user:{uid}"
+            : $"anon:{userName.Trim().ToLowerInvariant()}";
+
+    private static bool IsUniqueViolation(DbUpdateException ex) =>
+        ex.InnerException is SqlException { Number: 2601 or 2627 };
 
     private void EnsureOwnerAccess(Guid pollId)
     {

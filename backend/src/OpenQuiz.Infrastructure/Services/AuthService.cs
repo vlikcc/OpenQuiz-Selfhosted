@@ -219,9 +219,28 @@ public class AuthService : IAuthService
         if (!token.IsActive)
             throw Errors.Unauthorized("Invalid or expired reset token.");
 
+        var now = DateTime.UtcNow;
         token.User.PasswordHash = _hasher.Hash(req.NewPassword);
-        token.UsedAt = DateTime.UtcNow;
+        token.UsedAt = now;
+
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
         await _db.SaveChangesAsync(ct);
+
+        // A reset is the recovery path for a stolen account, so every existing
+        // session and any other pending reset link dies with it. Access tokens
+        // already handed out cannot be recalled; they expire on their own within
+        // Jwt:AccessTokenMinutes.
+        await _db.RefreshTokens
+            .Where(t => t.UserId == token.UserId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
+
+        await _db.PasswordResetTokens
+            .Where(t => t.UserId == token.UserId && t.Id != token.Id && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, now), ct);
+
+        await tx.CommitAsync(ct);
+
+        _logger.LogInformation("Password reset completed for {UserId}; all sessions revoked.", token.UserId);
     }
 
     private async Task<AuthResponse> IssueAsync(User user, CancellationToken ct)

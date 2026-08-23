@@ -30,9 +30,7 @@ public partial class WordCloudService : IWordCloudService
         var poll = await _db.Polls.Include(p => p.Questions).FirstOrDefaultAsync(p => p.Id == pollId, ct)
                    ?? throw Errors.NotFound("Poll");
 
-        var question = poll.Questions.OrderBy(q => q.OrderIndex)
-            .ElementAtOrDefault(req.QuestionIndex)
-            ?? throw Errors.Validation("Question index out of range.");
+        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex);
 
         var maxWords = question.MaxWords ?? 5;
         var normalizedTerms = req.Terms

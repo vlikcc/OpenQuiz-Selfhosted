@@ -79,7 +79,9 @@ export default function App() {
   const [activeScreen, setActiveScreen] = useState('tabs');
   const [activePollId, setActivePollId] = useState(() => initialPollId || localStorage.getItem('activePollId'));
   const [toast, setToast] = useState(null);
-  const [isCreating, setIsCreating] = useState(false);
+  // null when the dashboard is showing the poll list, otherwise the poll being
+  // composed: { contentType, pollId } with a null pollId for a new one.
+  const [composer, setComposer] = useState(null);
   const [showLandingPage, setShowLandingPage] = useState(true);
 
   // QR voter preload
@@ -103,9 +105,11 @@ export default function App() {
     else setActiveScreen(screen);
   }, []);
 
+  // Leaving or re-entering the create tab always starts a fresh poll, otherwise
+  // a poll left mid-edit would reappear behind the "Create" button.
   const handleTabChange = (tab) => {
-    if (tab === 'create') { setIsCreating(true); setActiveTab('dashboard'); }
-    else { setIsCreating(false); setActiveTab(tab); }
+    if (tab === 'create') { setComposer({ contentType: 'contest', pollId: null }); setActiveTab('dashboard'); }
+    else { setComposer(null); setActiveTab(tab); }
   };
 
   const handleGoogleLogin = async (idToken) => {
@@ -195,7 +199,6 @@ export default function App() {
           <PresenterMode
             pollId={activePollId}
             onExit={() => navigate('dashboard')}
-            onSwitchToVoter={() => navigate('voter')}
             showToast={showToast}
           />
         </div>
@@ -253,22 +256,21 @@ export default function App() {
               showToast={showToast}
               isAdmin={isAdmin}
               isAuthorized={isAuthorized}
-              isCreating={isCreating}
-              setIsCreating={setIsCreating}
+              composer={composer}
+              setComposer={setComposer}
             />
           )}
           {activeTab === 'profile' && (
             <ProfileScreen
               user={user}
               isAdmin={isAdmin}
-              isAuthorized={isAuthorized}
               onLogout={handleLogout}
               onNavigateToAdmin={() => setActiveScreen('admin')}
             />
           )}
         </div>
 
-        <TabBar activeTab={activeTab} onTabChange={handleTabChange} isAdmin={isAdmin} />
+        <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     </ErrorBoundary>
   );

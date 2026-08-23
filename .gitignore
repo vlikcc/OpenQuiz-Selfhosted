@@ -12,6 +12,10 @@ obj/
 # EF Core
 **/Migrations/Designer.cs
 
+# Test output
+TestResults/
+coverage/
+
 # Rider / VS
 .idea/
 *.DotSettings.user

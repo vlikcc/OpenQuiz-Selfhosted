@@ -10,8 +10,9 @@ import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import KatexRenderer from './KatexRenderer';
 import WordCloudCanvas from './wordcloud/WordCloudCanvas';
+import { mergeAnswerKey } from '../utils/pollAnswers';
 
-export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToast }) {
+export default function PresenterMode({ pollId, onExit, showToast }) {
   const { t } = useTranslation();
   const [poll, setPoll] = useState(null);
   const [aggregates, setAggregates] = useState([]);
@@ -30,7 +31,7 @@ export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToa
     pollService.get(pollId).then((p) => { if (active) setPoll(p); }).catch((e) => showToast(e.message, 'error'));
 
     const unsubPromise = realtimeService.subscribe(pollId, {
-      onPollUpdated: (p) => { if (active) setPoll(p); },
+      onPollUpdated: (p) => { if (active) setPoll((prev) => mergeAnswerKey(p, prev)); },
       onVoteCountsUpdated: (agg) => {
         if (!active) return;
         setAggregates((prev) => {

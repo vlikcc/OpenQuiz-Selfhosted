@@ -67,7 +67,33 @@ docker compose up -d --build
 docker compose down -v
 ```
 
-## 6. Customizing
+## 6. Rate limiting
+
+Anonymous endpoints are rate limited per caller. Signed-in callers get a bucket keyed on
+their user id, everyone else is bucketed by IP address. Defaults live under `RateLimiting`
+in `appsettings.json` and can be overridden with environment variables:
+
+| Policy | Endpoints | Default |
+|---|---|---|
+| `Auth` | register, login, refresh, Google sign-in, password reset | 10 / minute |
+| `Participation` | poll fetch, join, votes, open answers, word cloud, aggregates | 240 / minute |
+| `Reactions` | emoji reactions | 300 / minute |
+
+```bash
+RateLimiting__Participation__PermitLimit=480
+RateLimiting__Participation__WindowSeconds=60
+```
+
+A whole room usually shares one NAT address, so the participation budget is per venue
+rather than per person — raise it for large audiences.
+
+Behind a reverse proxy, set `RateLimiting__TrustForwardedHeaders=true` so the API buckets
+on `X-Forwarded-For` instead of the proxy address. **Only enable this when the API is
+unreachable except through the proxy**, otherwise a client can forge the header and mint
+itself a fresh quota. With the bundled Compose file that means removing the `5080` port
+mapping from the `api` service first.
+
+## 7. Customizing
 
 - **Different domain / TLS** — put nginx/Caddy/Traefik in front, terminate TLS there, set
   `PUBLIC_URL` and `VITE_API_BASE_URL` accordingly, rebuild `web`.
@@ -75,7 +101,7 @@ docker compose down -v
   managed SQL Server.
 - **Disable email** — leave `SMTP_HOST` blank. Password-reset endpoint then returns 503.
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 - `db` keeps restarting → the SA password fails MSSQL's complexity policy. Pick a 8+ char
   password with upper/lower/digit/symbol.

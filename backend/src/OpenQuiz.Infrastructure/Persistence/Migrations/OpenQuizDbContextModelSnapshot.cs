@@ -397,15 +397,19 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<string>("VoterKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PollId");
 
-                    b.HasIndex("QuestionId", "UserId")
-                        .IsUnique()
-                        .HasFilter("[UserId] IS NOT NULL");
-
                     b.HasIndex("QuestionId", "UserName");
+
+                    b.HasIndex("QuestionId", "VoterKey")
+                        .IsUnique();
 
                     b.ToTable("Votes", (string)null);
                 });
