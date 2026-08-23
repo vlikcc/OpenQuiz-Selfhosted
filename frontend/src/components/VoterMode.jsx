@@ -11,14 +11,14 @@ import KatexRenderer from './KatexRenderer';
 import WaitingRoom from './WaitingRoom';
 import WordCloudVoter from './wordcloud/WordCloudVoter';
 
-export default function VoterMode({ pollId, onExit, user, showToast, preloadedPoll = null }) {
+export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
   const { t } = useTranslation();
   const [step, setStep] = useState('name');
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState(() => localStorage.getItem('voterName') ?? '');
   const [poll, setPoll] = useState(preloadedPoll);
   const [currentQIndex, setCurrentQIndex] = useState(preloadedPoll?.currentQuestionIndex ?? 0);
   const [hasVotedForCurrent, setHasVotedForCurrent] = useState(false);
-  const [startTime, setStartTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(() => Date.now());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const [openAnswer, setOpenAnswer] = useState('');
@@ -37,11 +37,6 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
   }, []);
 
   const ct = (key) => t(`contentTypes.${key}.label`);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('voterName');
-    if (saved) setUserName(saved);
-  }, []);
 
   // Initial load + SignalR subscription
   useEffect(() => {
@@ -86,8 +81,6 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     let interval;
     if (isTimerRunning && timeLeft > 0 && !hasVotedForCurrent) {
       interval = setInterval(() => setTimeLeft((t) => t - 1), 1000);
-    } else if (timeLeft === 0) {
-      setIsTimerRunning(false);
     }
     return () => clearInterval(interval);
   }, [isTimerRunning, timeLeft, hasVotedForCurrent]);
@@ -103,25 +96,8 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     setStep('vote');
   }, [userName, pollId, isRegistered]);
 
-  const handleVote = useCallback((optionIndex) => {
-    const q = poll.questions[currentQIndex];
-    if (q.allowMultiple) {
-      if (hasVotedForCurrent) return;
-      setSelectedIndices((p) => p.includes(optionIndex) ? p.filter((i) => i !== optionIndex) : [...p, optionIndex]);
-      return;
-    }
-    if (isSubmitting || hasVotedForCurrent) return;
-    submitVote([optionIndex]);
-  }, [poll, currentQIndex, isSubmitting, hasVotedForCurrent]);
-
-  const handleSubmitMulti = () => {
-    if (selectedIndices.length === 0 || isSubmitting || hasVotedForCurrent) return;
-    submitVote(selectedIndices);
-  };
-
-  const submitVote = async (indices) => {
+  const submitVote = useCallback(async (indices) => {
     setIsSubmitting(true);
-    const q = poll.questions[currentQIndex];
     const typeKey = POLL_TYPE_KEY[poll.type] || 'contest';
     const typeCfg = CONTENT_TYPES[typeKey] || CONTENT_TYPES.contest;
 
@@ -141,6 +117,22 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     } finally {
       setIsSubmitting(false);
     }
+  }, [poll, pollId, currentQIndex, startTime, userName, showToast, t]);
+
+  const handleVote = useCallback((optionIndex) => {
+    const q = poll.questions[currentQIndex];
+    if (q.allowMultiple) {
+      if (hasVotedForCurrent) return;
+      setSelectedIndices((p) => p.includes(optionIndex) ? p.filter((i) => i !== optionIndex) : [...p, optionIndex]);
+      return;
+    }
+    if (isSubmitting || hasVotedForCurrent) return;
+    submitVote([optionIndex]);
+  }, [poll, currentQIndex, isSubmitting, hasVotedForCurrent, submitVote]);
+
+  const handleSubmitMulti = () => {
+    if (selectedIndices.length === 0 || isSubmitting || hasVotedForCurrent) return;
+    submitVote(selectedIndices);
   };
 
   const handleOpenAnswer = async () => {

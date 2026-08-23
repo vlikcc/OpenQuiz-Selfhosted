@@ -236,6 +236,8 @@
     "title": "{{title}} — Results Analysis",
     "questionsTab": "Questions",
     "leaderboardTab": "Leaderboard",
+    "barChart": "Bar",
+    "pieChart": "Pie",
     "totalParticipants": "Total participants",
     "questionLabel": "Question {{n}}: {{text}}",
     "notMultipleChoice": "This question is not multiple-choice.",

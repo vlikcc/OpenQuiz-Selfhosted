@@ -50,7 +50,7 @@ export const cacheUtils = {
         return null;
       }
       return item.value;
-    } catch (e) {
+    } catch {
       return null;
     }
   },

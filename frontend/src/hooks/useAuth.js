@@ -19,8 +19,6 @@ export function useAuth() {
         .then((u) => { if (alive) setUser(u); })
         .catch(() => { tokenStore.clear(); if (alive) setUser(null); })
         .finally(() => { if (alive) setLoading(false); });
-    } else {
-      setLoading(false);
     }
     return () => { alive = false; };
   }, []);

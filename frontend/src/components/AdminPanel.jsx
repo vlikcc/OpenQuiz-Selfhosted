@@ -12,20 +12,15 @@ export default function AdminPanel({ showToast }) {
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('authorized');
 
-  const refresh = async () => {
-    setLoading(true);
-    try {
-      const [auth, reg] = await Promise.all([userService.listAuthorized(), userService.listRegistered()]);
-      setAuthorizedUsers(auth);
-      setRegisteredUsers(reg);
-    } catch (e) {
-      showToast(e.message || t('admin.loadError'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const refresh = () =>
+    Promise.all([userService.listAuthorized(), userService.listRegistered()])
+      .then(([auth, reg]) => {
+        setAuthorizedUsers(auth);
+        setRegisteredUsers(reg);
+      })
+      .catch((e) => showToast(e.message || t('admin.loadError'), 'error'));
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
 
   const handleAddUser = async (e) => {
     e.preventDefault();

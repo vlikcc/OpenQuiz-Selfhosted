@@ -2,7 +2,7 @@ import React from 'react';
 import { Home, PlusCircle, User, Trophy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const TabBar = ({ activeTab, onTabChange, isAdmin }) => {
+const TabBar = ({ activeTab, onTabChange }) => {
     const { t } = useTranslation();
     const tabs = [
         { id: 'dashboard', label: t('tabs.dashboard'), icon: Home },

@@ -2,7 +2,7 @@ import React from 'react';
 import { User, LogOut, Shield, ChevronRight, Globe, Info, Bell, Moon, HelpCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const ProfileScreen = ({ user, isAdmin, isAuthorized, onLogout, onNavigateToAdmin }) => {
+const ProfileScreen = ({ user, isAdmin, onLogout, onNavigateToAdmin }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || i18n.language;
     const setLang = (l) => i18n.changeLanguage(l);

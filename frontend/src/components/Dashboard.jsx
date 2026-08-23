@@ -4,7 +4,8 @@ import { CONTENT_TYPES, POLL_TYPE_KEY, POLL_TYPE_VALUE, QUESTION_TYPE_VALUE, QUE
 import { pollService } from '../services/pollService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
-import KatexRenderer, { KatexEditor, KATEX_EXAMPLES, MARKDOWN_EXAMPLES } from './KatexRenderer';
+import KatexRenderer, { KatexEditor } from './KatexRenderer';
+import { KATEX_EXAMPLES } from '../config/katexExamples';
 import FileImport from './FileImport';
 
 const blankMultiple = () => ({ text: '', options: ['', ''], correctIndex: 0, questionType: 'multiple', correctAnswer: '', image: '', timeLimit: 30 });
@@ -37,19 +38,13 @@ export default function Dashboard({
 
   const ct = (key) => t(`contentTypes.${key}.label`);
 
-  const refresh = async () => {
-    setLoading(true);
-    try {
-      const list = await pollService.list();
-      setPolls(list || []);
-    } catch (err) {
-      showToast(err.message || t('dashboard.loadError'), 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const refresh = () =>
+    pollService
+      .list()
+      .then((list) => setPolls(list || []))
+      .catch((err) => showToast(err.message || t('dashboard.loadError'), 'error'));
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
 
   const handleImportQuestions = (importedQuestions) => {
     setQuestions(importedQuestions.map((q) => ({

@@ -28,7 +28,7 @@ function mergeAnswerKey(incoming, known) {
   };
 }
 
-export default function PresenterMode({ pollId, onExit, onSwitchToVoter, showToast }) {
+export default function PresenterMode({ pollId, onExit, showToast }) {
   const { t } = useTranslation();
   const [poll, setPoll] = useState(null);
   const [aggregates, setAggregates] = useState([]);

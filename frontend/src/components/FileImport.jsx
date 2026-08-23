@@ -89,7 +89,7 @@ export default function FileImport({ onImport, onClose }) {
             
             for (const line of lines) {
               // Seçenek kontrolü (A), B), C), D) veya a), b), c), d)
-              const optionMatch = line.match(/^([A-Da-d])[)\.]?\s*(.+)/);
+              const optionMatch = line.match(/^([A-Da-d])[).]?\s*(.+)/);
               // Cevap kontrolü
               const answerMatch = line.match(/^(?:Cevap|Doğru|Answer)[:\s]*([A-Da-d1-4])/i);
               

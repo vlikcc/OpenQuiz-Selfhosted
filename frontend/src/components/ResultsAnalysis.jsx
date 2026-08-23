@@ -86,6 +86,12 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
           {typeConfig.hasCorrectAnswer && (
             <button onClick={() => setActiveTab('leaderboard')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'leaderboard' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><Trophy size={16} className="inline mr-1" /> {t('results.leaderboardTab')}</button>
           )}
+          {activeTab === 'overview' && (
+            <div className="ml-auto flex gap-2">
+              <button onClick={() => setChartType('bar')} className={`px-3 py-2 rounded-lg text-sm ${chartType === 'bar' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>{t('results.barChart')}</button>
+              <button onClick={() => setChartType('pie')} className={`px-3 py-2 rounded-lg text-sm ${chartType === 'pie' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>{t('results.pieChart')}</button>
+            </div>
+          )}
         </div>
 
         {analytics && (

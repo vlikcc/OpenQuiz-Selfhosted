@@ -236,6 +236,8 @@
     "title": "{{title}} — Sonuç Analizi",
     "questionsTab": "Sorular",
     "leaderboardTab": "Liderlik",
+    "barChart": "Sütun",
+    "pieChart": "Pasta",
     "totalParticipants": "Toplam katılımcı",
     "questionLabel": "Soru {{n}}: {{text}}",
     "notMultipleChoice": "Bu soru çoktan seçmeli değil.",

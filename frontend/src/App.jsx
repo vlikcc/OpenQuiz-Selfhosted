@@ -199,7 +199,6 @@ export default function App() {
           <PresenterMode
             pollId={activePollId}
             onExit={() => navigate('dashboard')}
-            onSwitchToVoter={() => navigate('voter')}
             showToast={showToast}
           />
         </div>
@@ -267,14 +266,13 @@ export default function App() {
             <ProfileScreen
               user={user}
               isAdmin={isAdmin}
-              isAuthorized={isAuthorized}
               onLogout={handleLogout}
               onNavigateToAdmin={() => setActiveScreen('admin')}
             />
           )}
         </div>
 
-        <TabBar activeTab={activeTab} onTabChange={handleTabChange} isAdmin={isAdmin} />
+        <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     </ErrorBoundary>
   );
