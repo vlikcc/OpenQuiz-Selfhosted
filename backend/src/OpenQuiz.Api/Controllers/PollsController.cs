@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OpenQuiz.Api.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Application.Polls;
 
@@ -16,6 +18,7 @@ public class PollsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<PollDto>>> List(CancellationToken ct) => Ok(await _polls.ListAsync(ct));
 
+    [EnableRateLimiting(RateLimitPolicies.Participation)]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PollDto>> Get(Guid id, CancellationToken ct)
     {
@@ -61,6 +64,7 @@ public class PollsController : ControllerBase
     public async Task<ActionResult<PollDto>> End(Guid id, CancellationToken ct)
         => Ok(await _polls.EndAsync(id, ct));
 
+    [EnableRateLimiting(RateLimitPolicies.Participation)]
     [HttpPost("{id:guid}/join")]
     public async Task<ActionResult<PollDto>> Join(Guid id, [FromBody] JoinPollRequest req, CancellationToken ct)
         => Ok(await _polls.JoinAsync(id, req, ct));

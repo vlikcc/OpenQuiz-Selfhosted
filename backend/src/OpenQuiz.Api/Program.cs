@@ -5,7 +5,9 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using OpenQuiz.Api.Auth;
 using OpenQuiz.Api.Hubs;
+using Microsoft.AspNetCore.HttpOverrides;
 using OpenQuiz.Api.Middleware;
+using OpenQuiz.Api.RateLimiting;
 using OpenQuiz.Api.Realtime;
 using OpenQuiz.Application;
 using OpenQuiz.Application.Abstractions;
@@ -36,6 +38,23 @@ builder.Services.AddSignalR();
 
 builder.Services.AddSingleton<RealtimeThrottle>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
+
+// --- Rate limiting ---
+var rateLimits = builder.Configuration.GetSection(RateLimitOptions.SectionName).Get<RateLimitOptions>()
+                 ?? new RateLimitOptions();
+builder.Services.AddOpenQuizRateLimiting(rateLimits);
+
+if (rateLimits.TrustForwardedHeaders)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        // Container deployments do not know the proxy address up front; the
+        // operator opts in to this only when the proxy is the sole entry point.
+        o.KnownNetworks.Clear();
+        o.KnownProxies.Clear();
+    });
+}
 
 // --- AuthN/AuthZ ---
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
@@ -130,6 +149,8 @@ if (builder.Configuration.GetValue("App:AutoMigrate", true))
     }
 }
 
+if (rateLimits.TrustForwardedHeaders) app.UseForwardedHeaders();
+
 app.UseSerilogRequestLogging();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
@@ -141,6 +162,8 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+// After authentication so signed-in callers are partitioned by user id.
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHealthChecks("/health");

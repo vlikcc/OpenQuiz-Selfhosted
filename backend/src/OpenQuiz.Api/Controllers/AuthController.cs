@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OpenQuiz.Api.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Application.Auth;
 using OpenQuiz.Application.Common;
@@ -18,18 +20,22 @@ public class AuthController : ControllerBase
         _auth = auth; _current = current;
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [HttpPost("google")]
     public async Task<ActionResult<AuthResponse>> Google([FromBody] GoogleLoginRequest req, CancellationToken ct)
         => Ok(await _auth.GoogleLoginAsync(req, ct));
 
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register([FromBody] RegisterRequest req, CancellationToken ct)
         => Ok(await _auth.RegisterAsync(req, ct));
 
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [HttpPost("login")]
     public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequest req, CancellationToken ct)
         => Ok(await _auth.LoginAsync(req, ct));
 
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [HttpPost("refresh")]
     public async Task<ActionResult<AuthResponse>> Refresh([FromBody] RefreshRequest req, CancellationToken ct)
         => Ok(await _auth.RefreshAsync(req, ct));
@@ -50,6 +56,7 @@ public class AuthController : ControllerBase
         return me is null ? NotFound() : Ok(me);
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [HttpPost("password-reset/request")]
     public async Task<IActionResult> ResetRequest([FromBody] PasswordResetRequest req, CancellationToken ct)
     {
@@ -58,6 +65,7 @@ public class AuthController : ControllerBase
         return Accepted();
     }
 
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
     [HttpPost("password-reset/confirm")]
     public async Task<IActionResult> ResetConfirm([FromBody] PasswordResetConfirm req, CancellationToken ct)
     {
