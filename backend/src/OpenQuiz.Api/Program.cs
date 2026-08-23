@@ -51,7 +51,7 @@ if (rateLimits.TrustForwardedHeaders)
         o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
         // Container deployments do not know the proxy address up front; the
         // operator opts in to this only when the proxy is the sole entry point.
-        o.KnownNetworks.Clear();
+        o.KnownIPNetworks.Clear();
         o.KnownProxies.Clear();
     });
 }
