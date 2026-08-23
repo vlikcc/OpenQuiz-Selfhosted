@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { FileSpreadsheet, FileText, Upload, X, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+import { parseQuestionRows } from '../utils/questionImport';
 
 export default function FileImport({ onImport, onClose }) {
   const [importing, setImporting] = useState(false);
@@ -19,37 +20,9 @@ export default function FileImport({ onImport, onClose }) {
           const sheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[sheetName];
           const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
+
           // Format: Soru | Seçenek1 | Seçenek2 | Seçenek3 | Seçenek4 | Doğru Cevap (1-4)
-          const questions = [];
-          
-          for (let i = 1; i < json.length; i++) { // İlk satır başlık
-            const row = json[i];
-            if (!row[0]) continue; // Boş satır atla
-            
-            const question = {
-              text: String(row[0] || ''),
-              options: [],
-              correctIndex: 0
-            };
-            
-            // Seçenekleri al (en az 2, en fazla 6)
-            for (let j = 1; j <= 6; j++) {
-              if (row[j] && String(row[j]).trim()) {
-                question.options.push(String(row[j]).trim());
-              }
-            }
-            
-            // Doğru cevap indexi (son sütun)
-            const correctAnswer = parseInt(row[row.length - 1]) || 1;
-            question.correctIndex = Math.max(0, Math.min(correctAnswer - 1, question.options.length - 1));
-            
-            if (question.text && question.options.length >= 2) {
-              questions.push(question);
-            }
-          }
-          
-          resolve(questions);
+          resolve(parseQuestionRows(json));
         } catch (err) {
           reject(err);
         }
