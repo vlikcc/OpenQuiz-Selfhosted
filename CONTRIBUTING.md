@@ -27,6 +27,9 @@ The API applies pending migrations on startup, so an empty database is fine.
 See [README.md](README.md) and [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) for
 the full picture.
 
+Installing the frontend needs network access to `cdn.sheetjs.com`, which hosts
+the only patched `xlsx` build. [SECURITY.md](SECURITY.md) explains why.
+
 ## Running the checks
 
 CI runs exactly these, so run them before pushing.

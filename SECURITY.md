@@ -47,6 +47,17 @@ depend on skipping them will be closed as configuration issues.
 Regressions in any of the above are security bugs. They are covered by
 `backend/tests/OpenQuiz.Api.Tests`.
 
+## Dependencies
+
+`npm audit` and `dotnet list package --vulnerable` are expected to report
+nothing. Dependabot opens updates weekly; see
+[.github/dependabot.yml](.github/dependabot.yml).
+
+`xlsx` is installed from `https://cdn.sheetjs.com`, not from npm. SheetJS
+stopped publishing to npm at 0.18.5, which is still affected by the prototype
+pollution and ReDoS advisories, so the registry version can never go green.
+Keep the CDN URL when bumping it.
+
 ## Known gaps
 
 - The SignalR hub accepts anonymous connections, so anyone who knows a poll id

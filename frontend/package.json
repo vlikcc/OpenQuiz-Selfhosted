@@ -18,9 +18,8 @@
     "d3-selection": "^3.0.0",
     "i18next": "^25.10.10",
     "i18next-browser-languagedetector": "^8.2.1",
-    "jspdf": "^3.0.4",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.2",
-    "jwt-decode": "^4.0.0",
     "katex": "^0.16.25",
     "lucide-react": "^0.555.0",
     "mammoth": "^1.11.0",
@@ -29,11 +28,10 @@
     "react-i18next": "^15.7.4",
     "react-katex": "^3.1.0",
     "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.9.6",
     "recharts": "^3.5.0",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
