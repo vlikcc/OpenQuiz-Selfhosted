@@ -10,23 +10,7 @@ import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import KatexRenderer from './KatexRenderer';
 import WordCloudCanvas from './wordcloud/WordCloudCanvas';
-
-function mergeAnswerKey(incoming, known) {
-  if (!known?.questions?.length) return incoming;
-  const byId = new Map(known.questions.map((q) => [q.id, q]));
-  return {
-    ...incoming,
-    questions: (incoming.questions || []).map((q) => {
-      const previous = byId.get(q.id);
-      if (!previous) return q;
-      return {
-        ...q,
-        correctOptionIndex: q.correctOptionIndex ?? previous.correctOptionIndex,
-        correctAnswer: q.correctAnswer ?? previous.correctAnswer,
-      };
-    }),
-  };
-}
+import { mergeAnswerKey } from '../utils/pollAnswers';
 
 export default function PresenterMode({ pollId, onExit, showToast }) {
   const { t } = useTranslation();
@@ -47,9 +31,6 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
     pollService.get(pollId).then((p) => { if (active) setPoll(p); }).catch((e) => showToast(e.message, 'error'));
 
     const unsubPromise = realtimeService.subscribe(pollId, {
-      // The hub broadcasts to participants too, so its payload has the answer
-      // key stripped. Keep the answers from the presenter's own authenticated
-      // fetch, otherwise the correct bar stops being highlighted.
       onPollUpdated: (p) => { if (active) setPoll((prev) => mergeAnswerKey(p, prev)); },
       onVoteCountsUpdated: (agg) => {
         if (!active) return;

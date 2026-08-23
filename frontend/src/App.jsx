@@ -79,8 +79,9 @@ export default function App() {
   const [activeScreen, setActiveScreen] = useState('tabs');
   const [activePollId, setActivePollId] = useState(() => initialPollId || localStorage.getItem('activePollId'));
   const [toast, setToast] = useState(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [editingPollId, setEditingPollId] = useState(null);
+  // null when the dashboard is showing the poll list, otherwise the poll being
+  // composed: { contentType, pollId } with a null pollId for a new one.
+  const [composer, setComposer] = useState(null);
   const [showLandingPage, setShowLandingPage] = useState(true);
 
   // QR voter preload
@@ -107,9 +108,8 @@ export default function App() {
   // Leaving or re-entering the create tab always starts a fresh poll, otherwise
   // a poll left mid-edit would reappear behind the "Create" button.
   const handleTabChange = (tab) => {
-    setEditingPollId(null);
-    if (tab === 'create') { setIsCreating(true); setActiveTab('dashboard'); }
-    else { setIsCreating(false); setActiveTab(tab); }
+    if (tab === 'create') { setComposer({ contentType: 'contest', pollId: null }); setActiveTab('dashboard'); }
+    else { setComposer(null); setActiveTab(tab); }
   };
 
   const handleGoogleLogin = async (idToken) => {
@@ -256,10 +256,8 @@ export default function App() {
               showToast={showToast}
               isAdmin={isAdmin}
               isAuthorized={isAuthorized}
-              isCreating={isCreating}
-              setIsCreating={setIsCreating}
-              editingPollId={editingPollId}
-              setEditingPollId={setEditingPollId}
+              composer={composer}
+              setComposer={setComposer}
             />
           )}
           {activeTab === 'profile' && (

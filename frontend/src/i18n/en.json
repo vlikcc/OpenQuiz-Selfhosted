@@ -63,6 +63,7 @@
     "title": "Title",
     "questionCount": "{{count}} questions",
     "manage": "Manage & present",
+    "showQr": "Show QR code",
     "test": "Test",
     "idCopied": "ID copied",
     "createSaved": "{{type}} created!",
@@ -96,6 +97,7 @@
     "addMultipleChoice": "📋 Multiple choice",
     "addOpenEnded": "✏️ Open-ended",
     "addQuestion": "Add question",
+    "removeQuestion": "Remove question",
     "importFromFile": "Import from file",
     "points": "Points:"
   },

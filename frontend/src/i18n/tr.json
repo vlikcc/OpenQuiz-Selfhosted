@@ -63,6 +63,7 @@
     "title": "Başlık",
     "questionCount": "{{count}} Soru",
     "manage": "Yönet ve Sun",
+    "showQr": "QR kodunu göster",
     "test": "Test",
     "idCopied": "ID Kopyalandı",
     "createSaved": "{{type}} oluşturuldu!",
@@ -96,6 +97,7 @@
     "addMultipleChoice": "📋 Çoktan Seçmeli",
     "addOpenEnded": "✏️ Açık Uçlu",
     "addQuestion": "Soru Ekle",
+    "removeQuestion": "Soruyu kaldır",
     "importFromFile": "Dosyadan Yükle",
     "points": "Puan:"
   },
