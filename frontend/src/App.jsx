@@ -80,6 +80,7 @@ export default function App() {
   const [activePollId, setActivePollId] = useState(() => initialPollId || localStorage.getItem('activePollId'));
   const [toast, setToast] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [editingPollId, setEditingPollId] = useState(null);
   const [showLandingPage, setShowLandingPage] = useState(true);
 
   // QR voter preload
@@ -103,7 +104,10 @@ export default function App() {
     else setActiveScreen(screen);
   }, []);
 
+  // Leaving or re-entering the create tab always starts a fresh poll, otherwise
+  // a poll left mid-edit would reappear behind the "Create" button.
   const handleTabChange = (tab) => {
+    setEditingPollId(null);
     if (tab === 'create') { setIsCreating(true); setActiveTab('dashboard'); }
     else { setIsCreating(false); setActiveTab(tab); }
   };
@@ -255,6 +259,8 @@ export default function App() {
               isAuthorized={isAuthorized}
               isCreating={isCreating}
               setIsCreating={setIsCreating}
+              editingPollId={editingPollId}
+              setEditingPollId={setEditingPollId}
             />
           )}
           {activeTab === 'profile' && (

@@ -11,12 +11,20 @@ const blankMultiple = () => ({ text: '', options: ['', ''], correctIndex: 0, que
 const blankOpen = () => ({ text: '', questionType: 'open', correctAnswer: '', points: 10, image: '', timeLimit: 30 });
 const blankWordCloud = () => ({ text: '', questionType: 'wordcloud', image: '', timeLimit: 60, maxWords: 3 });
 
-export default function Dashboard({ onNavigate, user, showToast, isAdmin, isAuthorized }) {
+export default function Dashboard({
+  onNavigate,
+  user,
+  showToast,
+  isAdmin,
+  isAuthorized,
+  isCreating,
+  setIsCreating,
+  editingPollId,
+  setEditingPollId,
+}) {
   const { t } = useTranslation();
   const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isCreating, setIsCreating] = useState(false);
-  const [editingPollId, setEditingPollId] = useState(null);
   const [qrPoll, setQrPoll] = useState(null);
   const [showFileImport, setShowFileImport] = useState(false);
 
