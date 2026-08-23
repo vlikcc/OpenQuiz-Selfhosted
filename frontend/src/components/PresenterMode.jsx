@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
 import { Home, QrCode, Users, Loader2, ChevronRight, ChevronLeft, BarChart3, MessageSquare, Play, Square } from 'lucide-react';
 import { COLORS, CONTENT_TYPES, POLL_TYPE_KEY, POLL_STATUS_KEY, QUESTION_TYPE_KEY } from '../config/constants';
@@ -8,9 +8,11 @@ import { wordcloudService } from '../services/wordcloudService';
 import { realtimeService } from '../services/realtimeService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
-import KatexRenderer from './KatexRenderer';
-import WordCloudCanvas from './wordcloud/WordCloudCanvas';
+import KatexText from './KatexText';
 import { mergeAnswerKey } from '../utils/pollAnswers';
+
+// d3's layout solver is only needed by word cloud questions.
+const WordCloudCanvas = lazy(() => import('./wordcloud/WordCloudCanvas'));
 
 export default function PresenterMode({ pollId, onExit, showToast }) {
   const { t } = useTranslation();
@@ -130,7 +132,7 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
             <div className="mb-6">
               <div className="text-sm text-white/50 mb-2">{t('presenter.questionOf', { current: (poll.currentQuestionIndex || 0) + 1, total: poll.questions.length })}</div>
               <h2 className="text-3xl font-bold">
-                {typeKey === 'exam' && currentQ.text.includes('$') ? <KatexRenderer text={currentQ.text} /> : currentQ.text}
+                {typeKey === 'exam' && currentQ.text.includes('$') ? <KatexText text={currentQ.text} /> : currentQ.text}
               </h2>
             </div>
 
@@ -141,7 +143,11 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
 
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 min-h-[400px]">
               {isWordCloud ? (
-                <div className="h-[400px]"><WordCloudCanvas terms={wordCloud.terms} width={1000} height={400} /></div>
+                <div className="h-[400px]">
+                  <Suspense fallback={null}>
+                    <WordCloudCanvas terms={wordCloud.terms} width={1000} height={400} />
+                  </Suspense>
+                </div>
               ) : isOpen && activeTab === 'open' ? (
                 <ul className="space-y-2">
                   {openAnswers.filter((a) => a.questionId === currentQ.id).map((a) => (

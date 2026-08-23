@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { Suspense, lazy, useState, useEffect } from 'react';
 import { Trash2, Smartphone, Users, AlertTriangle, Copy, QrCode, Loader2, Edit2 } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_KEY } from '../config/constants';
 import { pollService } from '../services/pollService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
-import PollForm from './PollForm';
+import LoadingPanel from './LoadingPanel';
+
+// The editor reaches the spreadsheet parsers and the KaTeX preview; the poll
+// list itself needs none of that.
+const PollForm = lazy(() => import('./PollForm'));
 
 export default function Dashboard({
   onNavigate,
@@ -89,15 +93,17 @@ export default function Dashboard({
         </header>
 
         {composer ? (
-          // Remounting on a new intent is what discards the previous draft.
-          <PollForm
-            key={`${composer.pollId ?? 'new'}:${composer.contentType}`}
-            contentType={composer.contentType}
-            poll={polls.find((p) => p.id === composer.pollId) ?? null}
-            showToast={showToast}
-            onCancel={() => setComposer(null)}
-            onSaved={handleSaved}
-          />
+          <Suspense fallback={<LoadingPanel />}>
+            {/* Remounting on a new intent is what discards the previous draft. */}
+            <PollForm
+              key={`${composer.pollId ?? 'new'}:${composer.contentType}`}
+              contentType={composer.contentType}
+              poll={polls.find((p) => p.id === composer.pollId) ?? null}
+              showToast={showToast}
+              onCancel={() => setComposer(null)}
+              onSaved={handleSaved}
+            />
+          </Suspense>
         ) : loading ? (
           <div className="text-center py-10"><Loader2 className="animate-spin text-indigo-600 mx-auto" /></div>
         ) : (

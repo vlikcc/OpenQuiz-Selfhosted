@@ -4,7 +4,6 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Respon
 import { voteService } from '../services/voteService';
 import { scoreService } from '../services/scoreService';
 import { CONTENT_TYPES, POLL_TYPE_KEY, QUESTION_TYPE_KEY } from '../config/constants';
-import { buildScoreReportPdf, buildScoreReportWorkbook, saveScoreReportPdf, saveScoreReportWorkbook } from '../utils/scoreReport';
 import { useTranslation } from 'react-i18next';
 
 const CHART_COLORS = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#3B82F6', '#EF4444', '#14B8A6'];
@@ -51,11 +50,15 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
     sheet: t('results.sheetScores'),
   };
 
-  const handleExportPdf = () => {
+  // jsPDF and SheetJS together outweigh the rest of the app, and most sessions
+  // are never exported, so they are fetched when the button is pressed.
+  const handleExportPdf = async () => {
+    const { buildScoreReportPdf, saveScoreReportPdf } = await import('../utils/scoreReport');
     saveScoreReportPdf(buildScoreReportPdf(poll.title, scores, reportLabels), poll.title);
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const { buildScoreReportWorkbook, saveScoreReportWorkbook } = await import('../utils/scoreReport');
     saveScoreReportWorkbook(buildScoreReportWorkbook(scores, reportLabels), poll.title);
   };
 
