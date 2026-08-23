@@ -27,6 +27,14 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const votedQuestionsRef = useRef(new Set());
+  // The SignalR subscription below is created once per poll, so its handler
+  // cannot read `currentQIndex` from state without capturing a stale value.
+  const currentQIndexRef = useRef(currentQIndex);
+
+  const goToQuestion = useCallback((index) => {
+    currentQIndexRef.current = index;
+    setCurrentQIndex(index);
+  }, []);
 
   const ct = (key) => t(`contentTypes.${key}.label`);
 
@@ -43,7 +51,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     pollService.get(pollId).then((p) => {
       if (active && p) {
         setPoll(p);
-        setCurrentQIndex(p.currentQuestionIndex ?? 0);
+        goToQuestion(p.currentQuestionIndex ?? 0);
         const q = p.questions?.[p.currentQuestionIndex ?? 0];
         if (q) { setTimeLeft(q.timeLimit || 30); setIsTimerRunning(true); }
       }
@@ -54,10 +62,10 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
         if (!active) return;
         setPoll(p);
         const newQ = p.currentQuestionIndex ?? 0;
-        if (newQ !== currentQIndex) {
+        if (newQ !== currentQIndexRef.current) {
           const q = p.questions?.[newQ];
           if (q) { setTimeLeft(q.timeLimit || 30); setIsTimerRunning(true); }
-          setCurrentQIndex(newQ);
+          goToQuestion(newQ);
           const key = `${pollId}_${newQ}`;
           const voted = votedQuestionsRef.current.has(key);
           setHasVotedForCurrent(voted);
@@ -72,7 +80,7 @@ export default function VoterMode({ pollId, onExit, user, showToast, preloadedPo
     });
 
     return () => { active = false; unsubP.then((u) => u && u()); };
-  }, [pollId]);
+  }, [pollId, goToQuestion]);
 
   useEffect(() => {
     let interval;
