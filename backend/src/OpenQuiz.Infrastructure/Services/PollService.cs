@@ -47,11 +47,8 @@ public class PollService : IPollService
 
     public async Task<PollDto?> GetAsync(Guid id, CancellationToken ct)
     {
-        var poll = await _db.Polls.Include(p => p.Creator)
-                                  .Include(p => p.Questions).ThenInclude(q => q.Options)
-                                  .AsNoTracking()
-                                  .FirstOrDefaultAsync(p => p.Id == id, ct);
-        return poll is null ? null : Map(poll);
+        var poll = await LoadAsync(id, ct);
+        return poll is null ? null : MapForViewer(poll);
     }
 
     public async Task<PollDto> CreateAsync(CreatePollRequest req, CancellationToken ct)
@@ -149,9 +146,7 @@ public class PollService : IPollService
 
         poll.ParticipantCount++;
         await _db.SaveChangesAsync(ct);
-        var dto = (await GetAsync(id, ct))!;
-        await _realtime.PollUpdatedAsync(id, dto);
-        return dto;
+        return await PublishAsync(id, ct);
     }
 
     private async Task<PollDto> TransitionAsync(Guid id, Action<Poll> mutate, CancellationToken ct)
@@ -163,10 +158,50 @@ public class PollService : IPollService
         mutate(poll);
         poll.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
-        var dto = (await GetAsync(id, ct))!;
-        await _realtime.PollUpdatedAsync(id, dto);
-        return dto;
+        return await PublishAsync(id, ct);
     }
+
+    /// <summary>
+    /// Broadcasts the new poll state to the (anonymous) hub group and returns the
+    /// state the caller is allowed to see.
+    /// </summary>
+    private async Task<PollDto> PublishAsync(Guid id, CancellationToken ct)
+    {
+        var poll = (await LoadAsync(id, ct))!;
+        var full = Map(poll);
+        var forAudience = AnswersAreRevealed(poll.Status) ? full : WithoutAnswers(full);
+
+        await _realtime.PollUpdatedAsync(id, forAudience);
+        return CanSeeAnswers(poll) ? full : forAudience;
+    }
+
+    private Task<Poll?> LoadAsync(Guid id, CancellationToken ct) =>
+        _db.Polls.Include(p => p.Creator)
+                 .Include(p => p.Questions).ThenInclude(q => q.Options)
+                 .AsNoTracking()
+                 .FirstOrDefaultAsync(p => p.Id == id, ct);
+
+    private PollDto MapForViewer(Poll poll)
+    {
+        var dto = Map(poll);
+        return CanSeeAnswers(poll) ? dto : WithoutAnswers(dto);
+    }
+
+    private bool CanSeeAnswers(Poll poll) =>
+        _user.IsAdmin
+        || (_user.UserId is Guid uid && poll.CreatorId == uid)
+        || AnswersAreRevealed(poll.Status);
+
+    // Participants may review the key once the session is over, but never while
+    // the poll is still collecting answers.
+    private static bool AnswersAreRevealed(PollStatus status) => status == PollStatus.Ended;
+
+    private static PollDto WithoutAnswers(PollDto dto) => dto with
+    {
+        Questions = dto.Questions
+            .Select(q => q with { CorrectOptionIndex = null, CorrectAnswer = null })
+            .ToList()
+    };
 
     private void EnsureOwner(Poll poll)
     {
