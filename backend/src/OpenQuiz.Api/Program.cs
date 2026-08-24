@@ -34,10 +34,11 @@ builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
-builder.Services.AddSignalR();
 
-builder.Services.AddSingleton<RealtimeThrottle>();
-builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
+// --- Realtime (optionally fanned out across API instances) ---
+var realtime = builder.Configuration.GetSection(RealtimeOptions.SectionName).Get<RealtimeOptions>()
+               ?? new RealtimeOptions();
+builder.Services.AddOpenQuizRealtime(realtime);
 
 // --- Rate limiting ---
 var rateLimits = builder.Configuration.GetSection(RateLimitOptions.SectionName).Get<RateLimitOptions>()
@@ -124,6 +125,11 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
 
 // --- Pipeline ---
 var app = builder.Build();
+
+app.Logger.LogInformation(
+    realtime.UsesBackplane
+        ? "SignalR is using the Redis backplane; this instance can be one of several."
+        : "SignalR is running without a backplane. Run a single API instance, or set Realtime:RedisConnectionString.");
 
 if (generatedDevSigningKey)
 {

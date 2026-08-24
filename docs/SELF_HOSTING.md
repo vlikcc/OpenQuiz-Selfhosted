@@ -93,7 +93,40 @@ unreachable except through the proxy**, otherwise a client can forge the header 
 itself a fresh quota. With the bundled Compose file that means removing the `5080` port
 mapping from the `api` service first.
 
-## 7. Customizing
+## 7. Running more than one API instance
+
+SignalR keeps its groups in the memory of the process that owns the connection.
+With a single `api` container that is fine. Add a second and the room splits:
+a participant connected to instance A never hears an event published by
+instance B, so their question never advances.
+
+Point both instances at one Redis to fan the events out:
+
+```bash
+Realtime__RedisConnectionString=redis:6379
+Realtime__ChannelPrefix=openquiz   # only matters if several deployments share a Redis
+```
+
+```yaml
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+```
+
+Nothing is persisted in Redis — it carries live events only, so it can be
+restarted and needs no volume. The API logs which mode it is in at startup:
+
+```
+SignalR is using the Redis backplane; this instance can be one of several.
+SignalR is running without a backplane. Run a single API instance, or set Realtime:RedisConnectionString.
+```
+
+Vote-count and word-cloud broadcasts are coalesced per process, so N instances
+can emit up to N batches per window instead of one. That trades a little extra
+traffic for correctness and needs no configuration.
+
+## 8. Customizing
 
 - **Different domain / TLS** — put nginx/Caddy/Traefik in front, terminate TLS there, set
   `PUBLIC_URL` and `VITE_API_BASE_URL` accordingly, rebuild `web`.
@@ -101,7 +134,7 @@ mapping from the `api` service first.
   managed SQL Server.
 - **Disable email** — leave `SMTP_HOST` blank. Password-reset endpoint then returns 503.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 - `db` keeps restarting → the SA password fails MSSQL's complexity policy. Pick a 8+ char
   password with upper/lower/digit/symbol.
