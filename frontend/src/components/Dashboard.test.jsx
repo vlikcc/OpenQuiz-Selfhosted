@@ -9,6 +9,15 @@ vi.mock('../services/pollService', () => ({
   pollService: { list: vi.fn(), get: vi.fn(), remove: vi.fn(), duplicate: vi.fn() },
 }));
 
+vi.mock('./ResultsAnalysis', () => ({
+  default: ({ poll, onClose }) => (
+    <div>
+      <h2>Analiz: {poll.title}</h2>
+      <button type="button" onClick={onClose}>Kapat</button>
+    </div>
+  ),
+}));
+
 const summary = (n) => ({
   id: `poll-${n}`,
   title: `Yarışma ${n}`,
@@ -118,5 +127,23 @@ describe('copying a poll', () => {
     await screen.findByText('Yarışma 1');
 
     expect(screen.queryByRole('button', { name: 'Kopyasını oluştur' })).not.toBeInTheDocument();
+  });
+});
+
+describe('opening the analysis screen', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('loads the poll and overlays the report', async () => {
+    const user = userEvent.setup();
+    pollService.list.mockResolvedValue(page([summary(1)], false));
+    pollService.get.mockResolvedValue({ ...summary(1), questions: [] });
+
+    renderDashboard();
+    await screen.findByText('Yarışma 1');
+
+    await user.click(screen.getByRole('button', { name: 'Sonuçlar' }));
+
+    expect(pollService.get).toHaveBeenCalledWith('poll-1');
+    expect(await screen.findByRole('heading', { name: 'Analiz: Yarışma 1' })).toBeInTheDocument();
   });
 });
