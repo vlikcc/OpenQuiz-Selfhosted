@@ -20,6 +20,9 @@ Refresh tokens rotate on every `/api/auth/refresh` call.
 | POST | `/api/auth/password-reset/request` | — | `{ email }`; 503 if SMTP unset |
 | POST | `/api/auth/password-reset/confirm` | — | `{ token, newPassword }` |
 
+The reset e-mail points the browser at `{PublicUrl}/reset-password?token=…`.
+The SPA consumes that path; there is no separate static page.
+
 `AuthResponse` shape:
 ```json
 {
