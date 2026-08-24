@@ -1,6 +1,12 @@
 services:
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    # No `user:` override here on purpose. The 2022 image already runs sqlservr
+    # as the mssql account, and pinning a different uid/gid stops it creating
+    # the /.system directory it needs at startup.
+    security_opt:
+      - no-new-privileges:true
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
@@ -15,13 +21,22 @@ services:
       timeout: 5s
       retries: 20
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          # SQL Server refuses to start below 2 GB.
+          memory: ${DB_MEMORY_LIMIT:-4g}
+          cpus: "${DB_CPU_LIMIT:-2.0}"
 
   api:
     build:
       context: ./backend
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__Default: "Server=db;Database=OpenQuiz;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False"
@@ -41,8 +56,18 @@ services:
       App__PublicUrl: ${PUBLIC_URL:-http://localhost:8080}
       App__AdminEmail: ${ADMIN_EMAIL:-}
       Cors__AllowedOrigins: "${PUBLIC_URL:-http://localhost:8080},http://localhost:8080,http://127.0.0.1:8080"
+      Realtime__RedisConnectionString: ${REDIS_CONNECTION_STRING:-}
+      Observability__PrometheusEnabled: ${PROMETHEUS_ENABLED:-false}
+      Observability__OtlpEndpoint: ${OTLP_ENDPOINT:-}
     ports:
       - "${API_PORT:-5080}:8080"
+    volumes:
+      - api-logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEMORY_LIMIT:-1g}
+          cpus: "${API_CPU_LIMIT:-1.5}"
 
   web:
     build:
@@ -50,10 +75,25 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL-}
         VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_PORT:-8080}:8080"
+    deploy:
+      resources:
+        limits:
+          memory: ${WEB_MEMORY_LIMIT:-256m}
+          cpus: "${WEB_CPU_LIMIT:-0.5}"
 
 volumes:
   mssql-data:
+  api-logs:

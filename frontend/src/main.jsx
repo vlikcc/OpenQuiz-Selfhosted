@@ -19,3 +19,16 @@ root.render(
     ? <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>{tree}</GoogleOAuthProvider>
     : tree,
 );
+
+// The splash in index.html covers the gap before the bundle runs. Fading it out
+// from here rather than an inline script keeps the page free of inline
+// JavaScript, which is what lets the CSP forbid it outright. The second frame
+// is the first one React has painted into, so the splash never uncovers a blank
+// page.
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  const loader = document.getElementById('initial-loader');
+  if (!loader) return;
+
+  loader.classList.add('hidden');
+  setTimeout(() => loader.remove(), 300);
+}));

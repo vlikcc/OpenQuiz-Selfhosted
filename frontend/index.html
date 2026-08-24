@@ -10,31 +10,6 @@
 
   <title>Open Quiz</title>
 
-  <!-- Firebase preconnect - erken bağlantı -->
-  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
-  <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
-  <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin />
-  <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
-  <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
-
-  <!-- Fonts preconnect -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-  <script>
-    // Firebase yapılandırması
-    window.__firebase_config = JSON.stringify({
-      apiKey: "demo-api-key",
-      authDomain: "demo-project.firebaseapp.com",
-      projectId: "demo-project",
-      storageBucket: "demo-project.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:abcdef"
-    });
-    window.__app_id = 'quiz-app';
-    window.__initial_auth_token = null;
-  </script>
-
   <!-- Loading screen için kritik CSS - JS yüklenmeden önce göster -->
   <style>
     #initial-loader {
@@ -93,20 +68,8 @@
 
   <div id="root"></div>
 
+  <!-- main.jsx removes #initial-loader once React has painted. -->
   <script type="module" src="/src/main.jsx"></script>
-
-  <!-- Initial loader'ı kaldır -->
-  <script>
-    window.addEventListener('load', function () {
-      setTimeout(function () {
-        var loader = document.getElementById('initial-loader');
-        if (loader) {
-          loader.classList.add('hidden');
-          setTimeout(function () { loader.remove(); }, 300);
-        }
-      }, 100);
-    });
-  </script>
 </body>
 
 </html>

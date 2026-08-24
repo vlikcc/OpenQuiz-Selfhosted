@@ -13,8 +13,12 @@ ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 
 RUN npm run build
 
-FROM nginx:1.27-alpine AS runtime
+# The unprivileged variant runs the master process as uid 101 and listens on
+# 8080, so nothing in the web tier needs root or a privileged port.
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 80
-HEALTHCHECK CMD wget -qO- http://localhost/healthz || exit 1
+COPY security-headers.conf /etc/nginx/security-headers.conf
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
+    CMD wget -qO- http://localhost:8080/healthz || exit 1
