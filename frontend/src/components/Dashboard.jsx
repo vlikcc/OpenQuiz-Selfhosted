@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect } from 'react';
+import { Suspense, lazy, useCallback, useState, useEffect } from 'react';
 import { Trash2, Smartphone, Users, AlertTriangle, Copy, QrCode, Loader2, Edit2 } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_KEY } from '../config/constants';
 import { pollService } from '../services/pollService';
@@ -21,20 +21,54 @@ export default function Dashboard({
 }) {
   const { t } = useTranslation();
   const [polls, setPolls] = useState([]);
+  const [loadedPage, setLoadedPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [qrPoll, setQrPoll] = useState(null);
+  // The list only carries summaries, so editing fetches the questions itself.
+  const [editing, setEditing] = useState(null);
 
   const canCreateQuiz = isAdmin || isAuthorized;
 
   const ct = (key) => t(`contentTypes.${key}.label`);
 
-  const refresh = () =>
+  const loadPage = useCallback(
+    (page) =>
+      pollService
+        .list({ page })
+        .then((result) => {
+          setPolls((current) => (page === 1 ? result.items : [...current, ...result.items]));
+          setLoadedPage(page);
+          setHasMore(result.hasMore);
+        })
+        .catch((err) => showToast(err.message || t('dashboard.loadError'), 'error')),
+    [showToast, t],
+  );
+
+  useEffect(() => { loadPage(1).finally(() => setLoading(false)); }, [loadPage]);
+
+  useEffect(() => {
+    const pollId = composer?.pollId;
+    if (!pollId) return undefined;
+
+    let current = true;
     pollService
-      .list()
-      .then((list) => setPolls(list || []))
+      .get(pollId)
+      .then((poll) => { if (current) setEditing({ pollId, poll }); })
       .catch((err) => showToast(err.message || t('dashboard.loadError'), 'error'));
 
-  useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
+    return () => { current = false; };
+  }, [composer?.pollId, showToast, t]);
+
+  // Tagged with the id it was fetched for, so switching polls shows the loader
+  // rather than the previous poll's questions.
+  const editingPoll = composer?.pollId && editing?.pollId === composer.pollId ? editing.poll : null;
+
+  const handleLoadMore = () => {
+    setLoadingMore(true);
+    loadPage(loadedPage + 1).finally(() => setLoadingMore(false));
+  };
 
   const copyToClipboard = async (text) => {
     try { await navigator.clipboard.writeText(text); showToast(t('dashboard.idCopied')); }
@@ -46,7 +80,7 @@ export default function Dashboard({
     try {
       await pollService.remove(poll.id);
       showToast(t('dashboard.deleted'));
-      await refresh();
+      await loadPage(1);
     } catch (err) {
       showToast(err.message || t('dashboard.deleteError'), 'error');
     }
@@ -54,7 +88,7 @@ export default function Dashboard({
 
   const handleSaved = async () => {
     setComposer(null);
-    await refresh();
+    await loadPage(1);
   };
 
   const typeKey = (poll) => POLL_TYPE_KEY[poll.type] || 'contest';
@@ -93,17 +127,21 @@ export default function Dashboard({
         </header>
 
         {composer ? (
-          <Suspense fallback={<LoadingPanel />}>
-            {/* Remounting on a new intent is what discards the previous draft. */}
-            <PollForm
-              key={`${composer.pollId ?? 'new'}:${composer.contentType}`}
-              contentType={composer.contentType}
-              poll={polls.find((p) => p.id === composer.pollId) ?? null}
-              showToast={showToast}
-              onCancel={() => setComposer(null)}
-              onSaved={handleSaved}
-            />
-          </Suspense>
+          composer.pollId && !editingPoll ? (
+            <LoadingPanel />
+          ) : (
+            <Suspense fallback={<LoadingPanel />}>
+              {/* Remounting on a new intent is what discards the previous draft. */}
+              <PollForm
+                key={`${composer.pollId ?? 'new'}:${composer.contentType}`}
+                contentType={composer.contentType}
+                poll={editingPoll}
+                showToast={showToast}
+                onCancel={() => setComposer(null)}
+                onSaved={handleSaved}
+              />
+            </Suspense>
+          )
         ) : loading ? (
           <div className="text-center py-10"><Loader2 className="animate-spin text-indigo-600 mx-auto" /></div>
         ) : (
@@ -125,7 +163,7 @@ export default function Dashboard({
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${cfg.classes.badge} w-fit`}>{ct(tk)}</span>
                   <h3 className="text-base sm:text-lg font-bold mt-2 mb-2 line-clamp-2 text-slate-800">{poll.title || t('common.untitled')}</h3>
                   <p className="text-sm text-slate-500 mb-4 flex items-center gap-2">
-                    <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-bold">{t('dashboard.questionCount', { count: poll.questions?.length || 0 })}</span>
+                    <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-bold">{t('dashboard.questionCount', { count: poll.questionCount || 0 })}</span>
                     {poll.creatorEmail && isAdmin && <span className="text-xs text-slate-400 truncate max-w-[150px]">• {poll.creatorEmail.split('@')[0]}</span>}
                   </p>
                   <div className="mt-auto grid grid-cols-2 gap-2">
@@ -137,6 +175,18 @@ export default function Dashboard({
               );
             })}
             {polls.length === 0 && <div className="col-span-full py-10 text-center text-slate-400">{t('dashboard.empty')}</div>}
+            {hasMore && (
+              <div className="col-span-full flex justify-center py-4">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="px-6 py-2 border border-slate-300 text-slate-600 rounded-lg font-medium hover:bg-white disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loadingMore && <Loader2 className="animate-spin" size={16} />}
+                  {t('dashboard.loadMore')}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

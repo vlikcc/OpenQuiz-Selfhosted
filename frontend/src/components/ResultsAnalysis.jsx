@@ -19,7 +19,7 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
   useEffect(() => {
     if (!pollId) return;
     voteService.aggregates(pollId).then(setAggregates).catch(() => {});
-    voteService.listOpen(pollId).then(setOpenAnswers).catch(() => {});
+    voteService.allOpen(pollId).then(setOpenAnswers).catch(() => {});
     scoreService.leaderboard(pollId).then(setScores).catch(() => {});
   }, [pollId]);
 

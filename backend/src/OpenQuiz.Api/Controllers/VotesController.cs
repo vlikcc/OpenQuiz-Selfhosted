@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using OpenQuiz.Api.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using OpenQuiz.Application.Abstractions;
+using OpenQuiz.Application.Common;
 using OpenQuiz.Application.Votes;
 
 namespace OpenQuiz.Api.Controllers;
@@ -26,13 +27,13 @@ public class VotesController : ControllerBase
 
     [Authorize]
     [HttpGet("votes")]
-    public async Task<ActionResult<List<VoteDto>>> List(Guid pollId, CancellationToken ct)
-        => Ok(await _votes.ListAsync(pollId, ct));
+    public async Task<ActionResult<PagedResult<VoteDto>>> List(Guid pollId, [FromQuery] PageRequest paging, CancellationToken ct)
+        => Ok(await _votes.ListAsync(pollId, paging, ct));
 
     [Authorize]
     [HttpGet("open-answers")]
-    public async Task<ActionResult<List<OpenAnswerDto>>> ListOpen(Guid pollId, CancellationToken ct)
-        => Ok(await _votes.ListOpenAsync(pollId, ct));
+    public async Task<ActionResult<PagedResult<OpenAnswerDto>>> ListOpen(Guid pollId, [FromQuery] PageRequest paging, CancellationToken ct)
+        => Ok(await _votes.ListOpenAsync(pollId, paging, ct));
 
     [EnableRateLimiting(RateLimitPolicies.Participation)]
     [HttpGet("aggregates")]

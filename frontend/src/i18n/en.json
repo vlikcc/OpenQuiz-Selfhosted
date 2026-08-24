@@ -60,6 +60,7 @@
     "voterSubtitle": "Join polls and view results.",
     "notAuthorized": "You don't have permission to create polls.",
     "empty": "No polls yet.",
+    "loadMore": "Load more",
     "title": "Title",
     "questionCount": "{{count}} questions",
     "manage": "Manage & present",

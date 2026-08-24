@@ -64,7 +64,7 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
     const q = poll.questions?.[poll.currentQuestionIndex || 0];
     if (!q) return;
     const qt = QUESTION_TYPE_KEY[q.questionType];
-    if (qt === 'open') voteService.listOpen(pollId).then(setOpenAnswers).catch(() => {});
+    if (qt === 'open') voteService.allOpen(pollId).then(setOpenAnswers).catch(() => {});
     if (qt === 'wordcloud') wordcloudService.get(pollId, poll.currentQuestionIndex || 0).then(setWordCloud).catch(() => {});
   }, [poll?.currentQuestionIndex, poll?.id]);
 

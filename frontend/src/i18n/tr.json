@@ -60,6 +60,7 @@
     "voterSubtitle": "Yarışmalara katılabilir ve sonuçları görebilirsiniz.",
     "notAuthorized": "İçerik oluşturma yetkiniz yok",
     "empty": "Henüz yarışma yok.",
+    "loadMore": "Daha fazla göster",
     "title": "Başlık",
     "questionCount": "{{count}} Soru",
     "manage": "Yönet ve Sun",

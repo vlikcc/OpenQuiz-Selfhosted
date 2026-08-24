@@ -16,11 +16,16 @@ vi.mock('./services/realtimeService', () => ({
   realtimeService: { subscribe: vi.fn(() => Promise.resolve(() => {})) },
 }));
 
-const EXISTING_POLL = {
+const EXISTING_SUMMARY = {
   id: 'poll-1',
   title: 'Kaydedilmiş yarışma',
   type: POLL_TYPE_VALUE.contest,
   creatorEmail: 'creator@openquiz.test',
+  questionCount: 1,
+};
+
+const EXISTING_POLL = {
+  ...EXISTING_SUMMARY,
   questions: [{
     id: 'q0',
     orderIndex: 0,
@@ -40,7 +45,15 @@ describe('tab bar create flow', () => {
       loading: false,
       logout: vi.fn(),
     });
-    pollService.list.mockResolvedValue([EXISTING_POLL]);
+    pollService.list.mockResolvedValue({
+      items: [EXISTING_SUMMARY],
+      page: 1,
+      pageSize: 24,
+      totalCount: 1,
+      hasMore: false,
+    });
+    // The list only carries summaries, so the editor fetches the questions.
+    pollService.get.mockResolvedValue(EXISTING_POLL);
   });
 
   it('opens a blank create form from the Create tab', async () => {

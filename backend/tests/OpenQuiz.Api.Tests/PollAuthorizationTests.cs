@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using OpenQuiz.Api.Tests.Infrastructure;
+using OpenQuiz.Application.Common;
 using OpenQuiz.Application.Polls;
 
 namespace OpenQuiz.Api.Tests;
@@ -35,9 +36,10 @@ public class PollAuthorizationTests(SqlServerFixture sql) : ApiTestBase(sql)
         var mine = await CreatePollAsync(owner, SampleQuiz("Mine"));
         await CreatePollAsync(stranger, SampleQuiz("Theirs"));
 
-        var visible = await ReadAsync<List<PollDto>>(await owner.GetAsync("/api/polls"));
+        var visible = await ReadAsync<PagedResult<PollSummaryDto>>(await owner.GetAsync("/api/polls"));
 
-        Assert.Equal([mine.Id], visible.Select(p => p.Id).ToArray());
+        Assert.Equal([mine.Id], visible.Items.Select(p => p.Id).ToArray());
+        Assert.Equal(1, visible.TotalCount);
     }
 
     [Theory]

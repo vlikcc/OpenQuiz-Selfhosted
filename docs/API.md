@@ -31,11 +31,30 @@ Refresh tokens rotate on every `/api/auth/refresh` call.
 }
 ```
 
+## Paging
+
+`GET /api/polls`, `GET /api/polls/{id}/votes` and `GET /api/polls/{id}/open-answers`
+are paged. They accept `?page=` (1-based, default 1) and `?pageSize=`
+(default 20, capped at 200) and answer with:
+
+```json
+{
+  "items": [],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 137,
+  "hasMore": true
+}
+```
+
+Out-of-range values are clamped rather than rejected, so `pageSize=100000`
+returns 200 rows and `page=0` returns the first page.
+
 ## Polls
 
 | Method | Path | Auth |
 |---|---|---|
-| GET | `/api/polls` | bearer (own; admin sees all) |
+| GET | `/api/polls` | bearer (own; admin sees all) — paged summaries |
 | GET | `/api/polls/{id}` | — |
 | POST | `/api/polls` | bearer + `canCreate` |
 | PUT | `/api/polls/{id}` | bearer (owner/admin) |
@@ -46,6 +65,10 @@ Refresh tokens rotate on every `/api/auth/refresh` call.
 | POST | `/api/polls/{id}/end` | bearer (owner/admin) |
 | POST | `/api/polls/{id}/join` | — | `{ userName }` |
 
+The list returns summaries (`PollSummaryDto`: the poll's own fields plus
+`questionCount`) rather than the full `PollDto`. Fetch `/api/polls/{id}` for the
+questions and options.
+
 `PollType` enum: `1=Contest 2=Survey 3=Quiz 4=Exam 5=WordCloud`.
 `PollStatus`: `1=Waiting 2=Live 3=Ended`. `QuestionType`: `1=MultipleChoice 2=Open 3=WordCloud`.
 
@@ -55,8 +78,8 @@ Refresh tokens rotate on every `/api/auth/refresh` call.
 |---|---|---|
 | POST | `/api/polls/{id}/votes` | — | `{ questionIndex, selectedIndices[], responseTimeMs?, userName }` |
 | POST | `/api/polls/{id}/open-answers` | — | `{ questionIndex, answerText, userName }` |
-| GET | `/api/polls/{id}/votes` | bearer (owner/admin) |
-| GET | `/api/polls/{id}/open-answers` | bearer (owner/admin) |
+| GET | `/api/polls/{id}/votes` | bearer (owner/admin) — paged |
+| GET | `/api/polls/{id}/open-answers` | bearer (owner/admin) — paged |
 | GET | `/api/polls/{id}/aggregates` | — | Per-question option counts |
 
 ## Word Cloud

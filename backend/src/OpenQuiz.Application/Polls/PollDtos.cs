@@ -42,6 +42,25 @@ public record PollDto(
     DateTime? UpdatedAt,
     List<QuestionDto> Questions);
 
+/// <summary>
+/// What the poll list needs. The full <see cref="PollDto"/> carries every
+/// question and option, which is a lot of payload for a screen that only prints
+/// how many there are.
+/// </summary>
+public record PollSummaryDto(
+    Guid Id,
+    string Title,
+    PollType Type,
+    PollStatus Status,
+    int CurrentQuestionIndex,
+    int ParticipantCount,
+    bool IsActive,
+    Guid CreatorId,
+    string CreatorEmail,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt,
+    int QuestionCount);
+
 public record QuestionDto(
     Guid Id,
     int OrderIndex,
