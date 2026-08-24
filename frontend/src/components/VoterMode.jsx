@@ -7,7 +7,7 @@ import { wordcloudService } from '../services/wordcloudService';
 import { reactionService } from '../services/reactionService';
 import { realtimeService } from '../services/realtimeService';
 import { useTranslation } from 'react-i18next';
-import KatexRenderer from './KatexRenderer';
+import KatexText from './KatexText';
 import WaitingRoom from './WaitingRoom';
 import WordCloudVoter from './wordcloud/WordCloudVoter';
 
@@ -246,7 +246,7 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
 
         <div className="text-lg sm:text-xl font-bold text-slate-900">
           {q.imageUrl && (<div className="mb-4"><img src={q.imageUrl} alt="" className="max-h-48 rounded-lg shadow-sm mx-auto object-contain" /></div>)}
-          {isExam && q.text.includes('$') ? <KatexRenderer text={q.text} /> : q.text}
+          {isExam && q.text.includes('$') ? <KatexText text={q.text} /> : q.text}
         </div>
 
         {!hasVotedForCurrent && !isWordCloud && (
@@ -285,7 +285,7 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
                   : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-500'
               }`}
             >
-              {isExam && opt.text.includes('$') ? <KatexRenderer text={opt.text} /> : opt.text}
+              {isExam && opt.text.includes('$') ? <KatexText text={opt.text} /> : opt.text}
             </button>
           ))
         )}

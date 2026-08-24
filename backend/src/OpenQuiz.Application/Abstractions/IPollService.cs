@@ -1,10 +1,11 @@
+using OpenQuiz.Application.Common;
 using OpenQuiz.Application.Polls;
 
 namespace OpenQuiz.Application.Abstractions;
 
 public interface IPollService
 {
-    Task<List<PollDto>> ListAsync(CancellationToken ct);
+    Task<PagedResult<PollSummaryDto>> ListAsync(PageRequest page, CancellationToken ct);
     Task<PollDto?> GetAsync(Guid id, CancellationToken ct);
     Task<PollDto> CreateAsync(CreatePollRequest req, CancellationToken ct);
     Task<PollDto> UpdateAsync(Guid id, UpdatePollRequest req, CancellationToken ct);

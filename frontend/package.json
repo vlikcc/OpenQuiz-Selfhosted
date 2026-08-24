@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "check:bundle": "node scripts/check-bundle-budget.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview"

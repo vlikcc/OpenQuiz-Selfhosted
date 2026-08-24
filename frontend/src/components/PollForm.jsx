@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Plus, Trash2, XCircle, Upload, BookOpen, Image as ImageIcon, Timer } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_VALUE, QUESTION_TYPE_VALUE, QUESTION_TYPE_KEY } from '../config/constants';
 import { pollService } from '../services/pollService';
 import { useTranslation } from 'react-i18next';
-import KatexRenderer, { KatexEditor } from './KatexRenderer';
+import KatexText, { KatexTextEditor } from './KatexText';
 import { KATEX_EXAMPLES } from '../config/katexExamples';
-import FileImport from './FileImport';
+
+// Carries the spreadsheet and Word parsers, and most polls are typed by hand.
+const FileImport = lazy(() => import('./FileImport'));
 
 const blankMultiple = () => ({ text: '', options: ['', ''], correctIndex: 0, questionType: 'multiple', correctAnswer: '', image: '', timeLimit: 30 });
 const blankOpen = () => ({ text: '', questionType: 'open', correctAnswer: '', points: 10, image: '', timeLimit: 30 });
@@ -147,7 +149,11 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
 
   return (
     <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-2xl shadow-xl border border-indigo-50 max-w-6xl mx-auto">
-      {showFileImport && <FileImport onImport={handleImportQuestions} onClose={() => setShowFileImport(false)} />}
+      {showFileImport && (
+        <Suspense fallback={null}>
+          <FileImport onImport={handleImportQuestions} onClose={() => setShowFileImport(false)} />
+        </Suspense>
+      )}
 
       <div className="flex justify-between items-center mb-4 sm:mb-6 border-b pb-4">
         <h2 className="text-lg sm:text-xl font-bold text-slate-800">
@@ -183,7 +189,7 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
                 <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
                   {KATEX_EXAMPLES.map((ex, i) => (
                     <div key={i} className="bg-white p-2 rounded-lg border border-rose-100 text-center">
-                      <div className="text-lg mb-1"><KatexRenderer text={`$${ex.code}$`} /></div>
+                      <div className="text-lg mb-1"><KatexText text={`$${ex.code}$`} /></div>
                       <code className="text-[10px] text-slate-500 block truncate">${ex.code}$</code>
                     </div>
                   ))}
@@ -234,7 +240,7 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
 
               <label className="block text-xs font-bold text-indigo-600 uppercase mb-1">{t('dashboard.questionLabel', { n: qIndex + 1 })}</label>
               {contentType === 'exam' ? (
-                <KatexEditor value={q.text} onChange={(val) => updateField(qIndex, 'text', val)} placeholder={t('dashboard.questionPlaceholderExam')} rows={3} />
+                <KatexTextEditor value={q.text} onChange={(val) => updateField(qIndex, 'text', val)} placeholder={t('dashboard.questionPlaceholderExam')} rows={3} />
               ) : (
                 <input type="text" value={q.text} onChange={(e) => updateField(qIndex, 'text', e.target.value)} className="w-full p-3 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-200 outline-none font-medium" placeholder={t('dashboard.questionPlaceholder')} />
               )}
@@ -243,7 +249,7 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
             {q.questionType === 'open' ? (
               <div className="space-y-4">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{t('dashboard.expectedAnswer')}</label>
-                <KatexEditor value={q.correctAnswer || ''} onChange={(val) => updateField(qIndex, 'correctAnswer', val)} placeholder={t('dashboard.expectedAnswerPlaceholder')} rows={2} />
+                <KatexTextEditor value={q.correctAnswer || ''} onChange={(val) => updateField(qIndex, 'correctAnswer', val)} placeholder={t('dashboard.expectedAnswerPlaceholder')} rows={2} />
               </div>
             ) : q.questionType === 'wordcloud' ? (
               <div className="text-sm text-slate-500 italic bg-sky-50 border border-sky-200 rounded-lg p-3">

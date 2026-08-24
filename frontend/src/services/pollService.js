@@ -1,7 +1,9 @@
 import { api } from './apiClient';
+import { pageQuery } from './paging';
 
 export const pollService = {
-  list: () => api.get('/api/polls'),
+  /** Paged summaries: `{ items, page, pageSize, totalCount, hasMore }`. */
+  list: (paging) => api.get(`/api/polls?${pageQuery(paging)}`),
   get: (id) => api.get(`/api/polls/${id}`, { auth: false }),
   create: (data) => api.post('/api/polls', data),
   update: (id, data) => api.put(`/api/polls/${id}`, data),

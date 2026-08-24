@@ -64,36 +64,20 @@ public class VoteService : IVoteService
         };
         _db.Votes.Add(vote);
 
-        if (isCorrect == true)
-        {
-            var score = await _db.Scores.FirstOrDefaultAsync(s => s.PollId == poll.Id && s.UserName == vote.UserName, ct);
-            if (score is null)
-            {
-                _db.Scores.Add(new Score
-                {
-                    PollId = poll.Id,
-                    UserName = vote.UserName,
-                    Points = question.Points,
-                    TotalTimeMs = req.ResponseTimeMs ?? 0,
-                    UpdatedAt = DateTime.UtcNow
-                });
-            }
-            else
-            {
-                score.Points += question.Points;
-                score.TotalTimeMs += req.ResponseTimeMs ?? 0;
-                score.UpdatedAt = DateTime.UtcNow;
-            }
-        }
-
+        // The vote lands first so the unique index is what settles duplicates.
+        // Awarding points before that would credit a replay that then gets
+        // rejected.
         try
         {
             await _db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        catch (DbUpdateException ex) when (ConcurrentCounters.IsUniqueViolation(ex))
         {
             throw Errors.Conflict("You have already voted on this question.");
         }
+
+        if (isCorrect == true)
+            await AwardPointsAsync(poll.Id, vote.UserName, question.Points, req.ResponseTimeMs ?? 0, ct);
 
         // Recompute aggregate for this question and notify.
         var thisQ = await SingleQuestionAggregateAsync(poll.Id, question.Id, req.QuestionIndex, ct);
@@ -129,21 +113,42 @@ public class VoteService : IVoteService
         return new OpenAnswerDto(entity.Id, entity.QuestionId, entity.UserName, entity.AnswerText, entity.Score, entity.CreatedAt);
     }
 
-    public async Task<List<VoteDto>> ListAsync(Guid pollId, CancellationToken ct)
+    public async Task<PagedResult<VoteDto>> ListAsync(Guid pollId, PageRequest page, CancellationToken ct)
     {
         EnsureOwnerAccess(pollId);
-        var votes = await _db.Votes.AsNoTracking().Where(v => v.PollId == pollId).ToListAsync(ct);
-        return votes.Select(v => new VoteDto(
+
+        var q = _db.Votes.AsNoTracking().Where(v => v.PollId == pollId);
+        var total = await q.CountAsync(ct);
+
+        var votes = await q
+            .OrderBy(v => v.CreatedAt).ThenBy(v => v.Id)
+            .Skip(page.Skip)
+            .Take(page.PageSize)
+            .ToListAsync(ct);
+
+        var items = votes.Select(v => new VoteDto(
             v.Id, v.QuestionId, v.UserName,
             ParseIndices(v.SelectedOptionIndices),
             v.IsCorrect, v.ResponseTimeMs, v.CreatedAt)).ToList();
+
+        return new PagedResult<VoteDto>(items, page.Page, page.PageSize, total);
     }
 
-    public async Task<List<OpenAnswerDto>> ListOpenAsync(Guid pollId, CancellationToken ct)
+    public async Task<PagedResult<OpenAnswerDto>> ListOpenAsync(Guid pollId, PageRequest page, CancellationToken ct)
     {
         EnsureOwnerAccess(pollId);
-        var answers = await _db.OpenAnswers.AsNoTracking().Where(a => a.PollId == pollId).ToListAsync(ct);
-        return answers.Select(a => new OpenAnswerDto(a.Id, a.QuestionId, a.UserName, a.AnswerText, a.Score, a.CreatedAt)).ToList();
+
+        var q = _db.OpenAnswers.AsNoTracking().Where(a => a.PollId == pollId);
+        var total = await q.CountAsync(ct);
+
+        var items = await q
+            .OrderBy(a => a.CreatedAt).ThenBy(a => a.Id)
+            .Skip(page.Skip)
+            .Take(page.PageSize)
+            .Select(a => new OpenAnswerDto(a.Id, a.QuestionId, a.UserName, a.AnswerText, a.Score, a.CreatedAt))
+            .ToListAsync(ct);
+
+        return new PagedResult<OpenAnswerDto>(items, page.Page, page.PageSize, total);
     }
 
     public async Task<List<QuestionAggregate>> AggregatesAsync(Guid pollId, CancellationToken ct)
@@ -152,7 +157,13 @@ public class VoteService : IVoteService
             .FirstOrDefaultAsync(p => p.Id == pollId, ct)
             ?? throw Errors.NotFound("Poll");
 
-        var votes = await _db.Votes.AsNoTracking().Where(v => v.PollId == pollId).ToListAsync(ct);
+        // Selections are stored as a JSON array, so the counting has to happen
+        // here rather than in a GROUP BY. Only the three columns it needs are
+        // fetched, which keeps a busy poll from dragging every vote row across.
+        var votes = await _db.Votes.AsNoTracking()
+            .Where(v => v.PollId == pollId)
+            .Select(v => new { v.QuestionId, v.UserName, v.SelectedOptionIndices })
+            .ToListAsync(ct);
 
         var orderedQuestions = poll.Questions.OrderBy(q => q.OrderIndex).ToList();
         var result = new List<QuestionAggregate>(orderedQuestions.Count);
@@ -171,15 +182,42 @@ public class VoteService : IVoteService
         return result;
     }
 
+    /// <summary>
+    /// Adds to a running total, so two answers scored at the same moment do not
+    /// overwrite each other.
+    /// </summary>
+    private Task AwardPointsAsync(Guid pollId, string userName, int points, int elapsedMs, CancellationToken ct)
+    {
+        var now = DateTime.UtcNow;
+
+        return ConcurrentCounters.IncrementOrCreateAsync(
+            token => _db.Scores
+                .Where(s => s.PollId == pollId && s.UserName == userName)
+                .ExecuteUpdateAsync(set => set
+                    .SetProperty(s => s.Points, s => s.Points + points)
+                    .SetProperty(s => s.TotalTimeMs, s => s.TotalTimeMs + elapsedMs)
+                    .SetProperty(s => s.UpdatedAt, now), token),
+            async token =>
+            {
+                _db.Scores.Add(new Score
+                {
+                    PollId = pollId,
+                    UserName = userName,
+                    Points = points,
+                    TotalTimeMs = elapsedMs,
+                    UpdatedAt = now
+                });
+                await _db.SaveChangesAsync(token);
+            },
+            ct);
+    }
+
     // Signed-in voters are deduplicated on their account, anonymous ones on the
     // name they joined under, which is the only identity they have.
     private string VoterKeyFor(string userName) =>
         _user.UserId is Guid uid
             ? $"user:{uid}"
             : $"anon:{userName.Trim().ToLowerInvariant()}";
-
-    private static bool IsUniqueViolation(DbUpdateException ex) =>
-        ex.InnerException is SqlException { Number: 2601 or 2627 };
 
     private void EnsureOwnerAccess(Guid pollId)
     {

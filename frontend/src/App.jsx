@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback } from 'react';
 import { Trophy, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,12 +10,16 @@ import { tokenStore } from './services/tokenStore';
 
 import VoterMode from './components/VoterMode';
 import Dashboard from './components/Dashboard';
-import PresenterMode from './components/PresenterMode';
-import AdminPanel from './components/AdminPanel';
 import TabBar from './components/TabBar';
 import AuthScreen from './components/AuthScreen';
 import ProfileScreen from './components/ProfileScreen';
 import LandingPage from './components/LandingPage';
+import LoadingPanel from './components/LoadingPanel';
+
+// The presenter pulls in the charting stack and the admin panel is reachable by
+// a handful of accounts, so neither belongs in the bundle every voter downloads.
+const PresenterMode = lazy(() => import('./components/PresenterMode'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
 
 const urlParams = new URLSearchParams(window.location.search);
 const isVoterMode = urlParams.get('mode') === 'voter' && !!urlParams.get('id');
@@ -196,11 +200,13 @@ export default function App() {
     return (
       <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
         <div className="h-full w-full flex flex-col overflow-hidden">
-          <PresenterMode
-            pollId={activePollId}
-            onExit={() => navigate('dashboard')}
-            showToast={showToast}
-          />
+          <Suspense fallback={<LoadingPanel dark />}>
+            <PresenterMode
+              pollId={activePollId}
+              onExit={() => navigate('dashboard')}
+              showToast={showToast}
+            />
+          </Suspense>
         </div>
         {toast && (
           <div className={`fixed bottom-6 right-6 px-6 py-3 rounded-lg shadow-lg text-white font-medium flex items-center gap-2 animate-bounce-in z-50 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-800'}`}>
@@ -231,7 +237,9 @@ export default function App() {
             <h1 className="font-bold">{t('admin.title')}</h1>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <AdminPanel showToast={showToast} />
+            <Suspense fallback={<LoadingPanel />}>
+              <AdminPanel showToast={showToast} />
+            </Suspense>
           </div>
         </div>
       </ErrorBoundary>
