@@ -15,6 +15,12 @@ const VENDOR_CHUNKS = {
 }
 
 function chunkFor(id) {
+  // Vite injects a tiny preload helper that every `import()` calls. Rollup
+  // otherwise parks it in whichever vendor chunk it sees first — and if that
+  // chunk is jspdf, the landing page downloads 400 kB of PDF code just to
+  // lazy-load the poll editor.
+  if (id.includes('preload-helper')) return 'preload'
+
   if (!id.includes('node_modules')) return undefined
   const entry = Object.entries(VENDOR_CHUNKS).find(([, packages]) =>
     packages.some((pkg) => id.includes(`node_modules/${pkg}/`)),
