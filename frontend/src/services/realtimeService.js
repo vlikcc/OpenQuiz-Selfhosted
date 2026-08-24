@@ -33,6 +33,7 @@ function ensureConnection() {
   connection.on('WordCloudUpdated', (payload) => dispatch('onWordCloudUpdated', payload));
   connection.on('ReactionBurst', (r) => dispatch('onReaction', r));
   connection.on('OpenAnswerSubmitted', (e) => dispatch('onOpenAnswerSubmitted', e));
+  connection.on('LeaderboardUpdated', (payload) => dispatch('onLeaderboardUpdated', payload));
 
   connection.onreconnected(async () => {
     // Re-join all rooms we still care about.

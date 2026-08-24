@@ -1,9 +1,10 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import VoterMode from './VoterMode';
 import { pollService } from '../services/pollService';
 import { realtimeService } from '../services/realtimeService';
+import { voteService } from '../services/voteService';
 import { POLL_STATUS_VALUE, POLL_TYPE_VALUE, QUESTION_TYPE_VALUE } from '../config/constants';
 
 vi.mock('../services/pollService', () => ({
@@ -40,6 +41,19 @@ const poll = (currentQuestionIndex, participantCount = 1) => ({
   participantCount,
   questions: [question(0, false), question(1, true)],
 });
+
+/**
+ * The countdown runs off the server's clock, so a poll snapshot has to say when
+ * the question went on screen and what time it was when it said so.
+ */
+const timedPoll = (secondsAlreadyElapsed) => {
+  const now = Date.now();
+  return {
+    ...poll(1),
+    questionStartedAt: new Date(now - secondsAlreadyElapsed * 1000).toISOString(),
+    serverTime: new Date(now).toISOString(),
+  };
+};
 
 /** Hands back the handler the component registered with the hub. */
 function captureRealtimeHandlers() {
@@ -98,5 +112,66 @@ describe('VoterMode realtime updates', () => {
 
     expect(screen.getByText('SORU 1')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Seçenek A0' })).not.toHaveClass('ring-2');
+  });
+});
+
+/**
+ * The browser used to own the countdown, so an answer chosen but never sent was
+ * simply lost when time ran out — and a tab that had been paused could still
+ * send one long afterwards.
+ */
+describe('VoterMode question timer', () => {
+  beforeEach(() => {
+    pollService.join.mockResolvedValue({});
+    voteService.submit.mockResolvedValue({ isCorrect: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('counts down from the question start the server reported', async () => {
+    pollService.get.mockResolvedValue(timedPoll(12));
+    captureRealtimeHandlers();
+
+    await joinAsVoter();
+
+    // 30s limit, 12 already gone.
+    expect(await screen.findByText('18 sn')).toBeInTheDocument();
+  });
+
+  it('sends the chosen answer by itself when the time runs out', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    pollService.get.mockResolvedValue(timedPoll(29));
+    captureRealtimeHandlers();
+
+    const user = await joinAsVoter();
+    await user.click(await screen.findByRole('button', { name: 'Seçenek B1' }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    await waitFor(() => expect(voteService.submit).toHaveBeenCalledTimes(1));
+    expect(voteService.submit).toHaveBeenCalledWith(
+      POLL_ID,
+      expect.objectContaining({ questionIndex: 1, selectedIndices: [1] }),
+    );
+  });
+
+  it('closes the question with a notice when nothing was entered', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    pollService.get.mockResolvedValue(timedPoll(29));
+    captureRealtimeHandlers();
+
+    await joinAsVoter();
+    expect(await screen.findByText('SORU 2')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+
+    expect(await screen.findByText('SÜRE DOLDU')).toBeInTheDocument();
+    expect(voteService.submit).not.toHaveBeenCalled();
   });
 });

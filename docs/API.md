@@ -20,6 +20,9 @@ Refresh tokens rotate on every `/api/auth/refresh` call.
 | POST | `/api/auth/password-reset/request` | — | `{ email }`; 503 if SMTP unset |
 | POST | `/api/auth/password-reset/confirm` | — | `{ token, newPassword }` |
 
+The reset e-mail points the browser at `{PublicUrl}/reset-password?token=…`.
+The SPA consumes that path; there is no separate static page.
+
 `AuthResponse` shape:
 ```json
 {
@@ -58,6 +61,7 @@ returns 200 rows and `page=0` returns the first page.
 | GET | `/api/polls/{id}` | — |
 | POST | `/api/polls` | bearer + `canCreate` |
 | PUT | `/api/polls/{id}` | bearer (owner/admin) |
+| POST | `/api/polls/{id}/duplicate` | bearer (owner/admin) + `canCreate` — `{ title? }` |
 | DELETE | `/api/polls/{id}` | bearer (owner/admin) |
 | POST | `/api/polls/{id}/activate` | bearer (owner/admin) |
 | POST | `/api/polls/{id}/next-question` | bearer (owner/admin) |
@@ -68,6 +72,12 @@ returns 200 rows and `page=0` returns the first page.
 The list returns summaries (`PollSummaryDto`: the poll's own fields plus
 `questionCount`) rather than the full `PollDto`. Fetch `/api/polls/{id}` for the
 questions and options.
+
+`duplicate` returns a new poll that owns copies of every question and option,
+belongs to the caller, and is back in `Waiting` with no participants or answers —
+a poll holds one session's worth of answers, so running the same material again
+needs a fresh one. `title` is optional; the server appends a suffix when it is
+omitted.
 
 `PollType` enum: `1=Contest 2=Survey 3=Quiz 4=Exam 5=WordCloud`.
 `PollStatus`: `1=Waiting 2=Live 3=Ended`. `QuestionType`: `1=MultipleChoice 2=Open 3=WordCloud`.
@@ -80,6 +90,11 @@ questions and options.
 | POST | `/api/polls/{id}/open-answers` | — | `{ questionIndex, answerText, userName }` |
 | GET | `/api/polls/{id}/votes` | bearer (owner/admin) — paged |
 | GET | `/api/polls/{id}/open-answers` | bearer (owner/admin) — paged |
+| PUT | `/api/polls/{id}/open-answers/{answerId}/score` | bearer (owner/admin) — `{ score }` |
+
+Grading a written answer moves the difference onto the poll's leaderboard, so a
+corrected grade replaces the earlier one and `{ "score": null }` takes the points
+back. A grade above the question's `points` is a `400`.
 | GET | `/api/polls/{id}/aggregates` | — | Per-question option counts |
 
 ## Word Cloud
@@ -87,9 +102,33 @@ questions and options.
 | Method | Path | Auth |
 |---|---|---|
 | POST | `/api/polls/{id}/wordcloud/submit` | — | `{ questionIndex, terms[], userName }` |
-| GET | `/api/polls/{id}/wordcloud/{questionIndex}?topN=50` | — |
+| GET | `/api/polls/{id}/wordcloud/{questionIndex}?topN=` | — | `topN` defaults to the question's own setting |
 
 Terms are normalized server-side (lowercase, trim, regex filter) and de-duplicated.
+
+### Moderation
+
+Each word cloud question carries its own moderation as JSON in
+`question.wordCloudConfig`. Every field is optional and an unreadable config
+falls back to the defaults rather than failing a live submission.
+
+```json
+{
+  "maxWordsPerUser": 3,
+  "minTermLength": 2,
+  "maxTermLength": 64,
+  "blacklist": ["spam"],
+  "topN": 50,
+  "allowDuplicatesFromSameUser": false,
+  "profanityFilter": true
+}
+```
+
+- `blacklist` and the built-in profanity list are applied to submissions *and* to
+  what `GET` returns, so blocking a word mid-session also clears it from the wall.
+- A submission whose every term is blocked is a `400`; one whose every term the
+  same participant already sent is a `409`.
+- `maxWordsPerUser` is only consulted when the question has no `maxWords`.
 
 ## Scores & Users
 
@@ -117,3 +156,4 @@ Server → client events:
 | `WordCloudUpdated` | `{ questionIndex, terms: [{ term, count }] }` (throttled 250 ms) |
 | `OpenAnswerSubmitted` | `{ questionIndex, userName }` |
 | `ReactionBurst` | `{ emoji, sender, at }` |
+| `LeaderboardUpdated` | `{ entries: [{ userName, points, totalTimeMs }] }` — top 10, after any answer or grade that moves points (throttled 250 ms) |

@@ -12,4 +12,5 @@ public interface IRealtimeNotifier
     Task WordCloudUpdatedAsync(Guid pollId, WordCloudResponse payload);
     Task ReactionAsync(Guid pollId, ReactionEvent reaction);
     Task OpenAnswerSubmittedAsync(Guid pollId, int questionIndex, string userName);
+    Task LeaderboardUpdatedAsync(Guid pollId, LeaderboardUpdate payload);
 }

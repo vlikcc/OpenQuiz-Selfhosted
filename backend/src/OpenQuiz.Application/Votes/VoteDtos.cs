@@ -20,6 +20,12 @@ public record VoteDto(
     int? ResponseTimeMs,
     DateTime CreatedAt);
 
+/// <summary>
+/// A grade for one open-ended answer. Null clears a grade that was awarded by
+/// mistake, which also takes the points back off the leaderboard.
+/// </summary>
+public record ScoreOpenAnswerRequest(int? Score);
+
 public record OpenAnswerDto(
     Guid Id,
     Guid QuestionId,

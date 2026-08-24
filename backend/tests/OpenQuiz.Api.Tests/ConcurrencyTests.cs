@@ -55,6 +55,17 @@ public class ConcurrencyTests(SqlServerFixture sql) : ApiTestBase(sql)
 
         var voters = await Task.WhenAll(Enumerable.Range(0, Crowd).Select(async _ => ClientFor(await RegisterAsync())));
 
+        // Response time is measured against the question's start, so pushing that
+        // into the past gives every answer a known floor to accumulate.
+        const int ElapsedSeconds = 5;
+        await using (var setup = CreateDbContext())
+        {
+            await setup.Polls
+                .Where(p => p.Id == poll.Id)
+                .ExecuteUpdateAsync(set => set.SetProperty(
+                    p => p.QuestionStartedAt, DateTime.UtcNow.AddSeconds(-ElapsedSeconds)));
+        }
+
         try
         {
             var votes = await Task.WhenAll(voters.Select(voter =>
@@ -68,7 +79,7 @@ public class ConcurrencyTests(SqlServerFixture sql) : ApiTestBase(sql)
 
             // Option 1 is correct and each question is worth 10.
             Assert.Equal(Crowd * 10, score.Points);
-            Assert.Equal(Crowd * 1200L, score.TotalTimeMs);
+            Assert.True(score.TotalTimeMs >= Crowd * ElapsedSeconds * 1000L, $"summed {score.TotalTimeMs} ms");
         }
         finally
         {
@@ -97,9 +108,9 @@ public class ConcurrencyTests(SqlServerFixture sql) : ApiTestBase(sql)
     }
 
     [Fact]
-    public async Task Repeating_a_term_within_one_submission_counts_every_mention()
+    public async Task Repeating_a_term_within_one_submission_counts_every_mention_when_repeats_are_allowed()
     {
-        var (_, poll) = await LivePollAsync(WordCloudPoll());
+        var (_, poll) = await LivePollAsync(WordCloudPoll("""{"allowDuplicatesFromSameUser":true}"""));
 
         var response = await PostAsync(Anonymous, $"/api/polls/{poll.Id}/wordcloud/submit",
             new WordCloudSubmitRequest(0, ["Docker", "docker", "  DOCKER  "], "Ada"));
@@ -140,7 +151,7 @@ public class ConcurrencyTests(SqlServerFixture sql) : ApiTestBase(sql)
         Assert.Equal(PollStatus.Ended, stored.Status);
     }
 
-    private static CreatePollRequest WordCloudPoll() => new(
+    private static CreatePollRequest WordCloudPoll(string? config = null) => new(
         "Which tools do you use?",
         PollType.WordCloud,
         [
@@ -155,7 +166,7 @@ public class ConcurrencyTests(SqlServerFixture sql) : ApiTestBase(sql)
                 CorrectAnswer: null,
                 Points: 10,
                 MaxWords: 5,
-                WordCloudConfig: null,
+                WordCloudConfig: config,
                 Options: []),
         ]);
 

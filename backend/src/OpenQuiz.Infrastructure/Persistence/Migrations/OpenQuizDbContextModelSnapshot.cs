@@ -17,7 +17,7 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -139,6 +139,9 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("ParticipantCount")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("QuestionStartedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()

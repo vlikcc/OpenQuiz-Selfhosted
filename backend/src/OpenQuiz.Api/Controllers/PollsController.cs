@@ -39,6 +39,12 @@ public class PollsController : ControllerBase
         => Ok(await _polls.UpdateAsync(id, req, ct));
 
     [Authorize]
+    [HttpPost("{id:guid}/duplicate")]
+    public async Task<ActionResult<PollDto>> Duplicate(
+        Guid id, [FromBody] DuplicatePollRequest? req, CancellationToken ct)
+        => Ok(await _polls.DuplicateAsync(id, req ?? new DuplicatePollRequest(), ct));
+
+    [Authorize]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {

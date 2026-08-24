@@ -88,6 +88,69 @@ public class PollService : IPollService
         return (await GetAsync(poll.Id, ct))!;
     }
 
+    /// <summary>
+    /// A fresh, unstarted copy of a poll under the caller's name. Running the
+    /// same quiz with a second group meant retyping every question, because a
+    /// poll carries one session's worth of answers and cannot be replayed.
+    /// </summary>
+    public async Task<PollDto> DuplicateAsync(Guid id, DuplicatePollRequest req, CancellationToken ct)
+    {
+        if (!_user.IsAuthenticated || _user.UserId is not Guid uid) throw Errors.Unauthorized();
+        if (!_user.IsAdmin && !_user.CanCreate) throw Errors.Forbidden("You are not authorized to create polls.");
+
+        var source = await _db.Polls
+            .Include(p => p.Questions).ThenInclude(q => q.Options)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == id, ct)
+            ?? throw Errors.NotFound("Poll");
+
+        EnsureOwner(source);
+
+        var title = string.IsNullOrWhiteSpace(req.Title) ? DefaultCopyTitle(source.Title) : req.Title.Trim();
+        if (title.Length > 256) title = title[..256];
+
+        var copy = new Poll
+        {
+            Title = title,
+            Type = source.Type,
+            Status = PollStatus.Waiting,
+            CurrentQuestionIndex = 0,
+            CreatorId = uid,
+            CreatedAt = DateTime.UtcNow,
+            Questions = [.. source.Questions
+                .OrderBy(q => q.OrderIndex)
+                .Select((q, idx) => new Question
+                {
+                    OrderIndex = idx,
+                    Text = q.Text,
+                    ImageUrl = q.ImageUrl,
+                    TimeLimit = q.TimeLimit,
+                    QuestionType = q.QuestionType,
+                    AllowMultiple = q.AllowMultiple,
+                    CorrectOptionIndex = q.CorrectOptionIndex,
+                    CorrectAnswer = q.CorrectAnswer,
+                    Points = q.Points,
+                    MaxWords = q.MaxWords,
+                    WordCloudConfig = q.WordCloudConfig,
+                    Options = [.. q.Options
+                        .OrderBy(o => o.OrderIndex)
+                        .Select((o, oIdx) => new Option { OrderIndex = oIdx, Text = o.Text })]
+                })]
+        };
+
+        _db.Polls.Add(copy);
+        await _db.SaveChangesAsync(ct);
+        return (await GetAsync(copy.Id, ct))!;
+    }
+
+    private static string DefaultCopyTitle(string title)
+    {
+        const string suffix = " (kopya)";
+        return title.Length + suffix.Length > 256
+            ? title[..(256 - suffix.Length)] + suffix
+            : title + suffix;
+    }
+
     public async Task<PollDto> UpdateAsync(Guid id, UpdatePollRequest req, CancellationToken ct)
     {
         await _updateValidator.ValidateAndThrowAsync(req, ct);
@@ -129,24 +192,27 @@ public class PollService : IPollService
             p.IsActive = true;
             p.CurrentQuestionIndex = 0;
             p.ParticipantCount = 0;
+            p.QuestionStartedAt = DateTime.UtcNow;
         }, ct);
 
     public async Task<PollDto> NextQuestionAsync(Guid id, CancellationToken ct) =>
         await TransitionAsync(id, p =>
         {
             var total = p.Questions.Count;
-            if (p.CurrentQuestionIndex + 1 >= total) { p.Status = PollStatus.Ended; p.IsActive = false; }
-            else p.CurrentQuestionIndex++;
+            if (p.CurrentQuestionIndex + 1 >= total) { p.Status = PollStatus.Ended; p.IsActive = false; p.QuestionStartedAt = null; }
+            else { p.CurrentQuestionIndex++; p.QuestionStartedAt = DateTime.UtcNow; }
         }, ct);
 
+    // Going back restarts the clock: the question is being put on screen again,
+    // and leaving the original start would hand everyone an expired question.
     public async Task<PollDto> PrevQuestionAsync(Guid id, CancellationToken ct) =>
         await TransitionAsync(id, p =>
         {
-            if (p.CurrentQuestionIndex > 0) p.CurrentQuestionIndex--;
+            if (p.CurrentQuestionIndex > 0) { p.CurrentQuestionIndex--; p.QuestionStartedAt = DateTime.UtcNow; }
         }, ct);
 
     public async Task<PollDto> EndAsync(Guid id, CancellationToken ct) =>
-        await TransitionAsync(id, p => { p.Status = PollStatus.Ended; p.IsActive = false; }, ct);
+        await TransitionAsync(id, p => { p.Status = PollStatus.Ended; p.IsActive = false; p.QuestionStartedAt = null; }, ct);
 
     public async Task<PollDto> JoinAsync(Guid id, JoinPollRequest req, CancellationToken ct)
     {
@@ -243,9 +309,12 @@ public class PollService : IPollService
         throw Errors.Forbidden("Not the owner of this poll.");
     }
 
-    private static Question MapQuestion(QuestionInput q, int fallbackOrder) => new()
+    // Position wins over whatever index the payload carries: the order indices are
+    // unique per poll in the database, and a client that repeats or skips one would
+    // otherwise take the whole request down with a constraint violation.
+    private static Question MapQuestion(QuestionInput q, int order) => new()
     {
-        OrderIndex = q.OrderIndex >= 0 ? q.OrderIndex : fallbackOrder,
+        OrderIndex = order,
         Text = q.Text,
         ImageUrl = q.ImageUrl,
         TimeLimit = q.TimeLimit > 0 ? q.TimeLimit : 30,
@@ -257,13 +326,14 @@ public class PollService : IPollService
         MaxWords = q.MaxWords,
         WordCloudConfig = q.WordCloudConfig,
         Options = q.Options.OrderBy(o => o.OrderIndex)
-            .Select((o, idx) => new Option { OrderIndex = o.OrderIndex >= 0 ? o.OrderIndex : idx, Text = o.Text })
+            .Select((o, idx) => new Option { OrderIndex = idx, Text = o.Text })
             .ToList()
     };
 
     private static PollDto Map(Poll p) => new(
         p.Id, p.Title, p.Type, p.Status, p.CurrentQuestionIndex, p.ParticipantCount, p.IsActive,
         p.CreatorId, p.Creator?.Email ?? string.Empty, p.CreatedAt, p.UpdatedAt,
+        p.QuestionStartedAt, DateTime.UtcNow,
         p.Questions.OrderBy(q => q.OrderIndex).Select(q => new QuestionDto(
             q.Id, q.OrderIndex, q.Text, q.ImageUrl, q.TimeLimit, q.QuestionType,
             q.AllowMultiple, q.CorrectOptionIndex, q.CorrectAnswer, q.Points,

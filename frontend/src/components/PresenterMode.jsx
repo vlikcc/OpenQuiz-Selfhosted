@@ -1,18 +1,35 @@
-import { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
-import { Home, QrCode, Users, Loader2, ChevronRight, ChevronLeft, BarChart3, MessageSquare, Play, Square } from 'lucide-react';
+import { Home, QrCode, Users, Loader2, ChevronRight, ChevronLeft, BarChart3, MessageSquare, Play, Square, Trophy } from 'lucide-react';
 import { COLORS, CONTENT_TYPES, POLL_TYPE_KEY, POLL_STATUS_KEY, QUESTION_TYPE_KEY } from '../config/constants';
 import { pollService } from '../services/pollService';
 import { voteService } from '../services/voteService';
 import { wordcloudService } from '../services/wordcloudService';
+import { scoreService } from '../services/scoreService';
+import { reactionService } from '../services/reactionService';
 import { realtimeService } from '../services/realtimeService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import KatexText from './KatexText';
+import OpenAnswerList from './OpenAnswerList';
+import Leaderboard from './Leaderboard';
 import { mergeAnswerKey } from '../utils/pollAnswers';
 
 // d3's layout solver is only needed by word cloud questions.
 const WordCloudCanvas = lazy(() => import('./wordcloud/WordCloudCanvas'));
+
+// What the wall has room for, and what the hub sends after a scored answer.
+const LEADERBOARD_SIZE = 10;
+
+/** Keeps the running totals in step with the bursts arriving from the hub. */
+function bumpTally(tally, emoji) {
+  const index = tally.findIndex((t) => t.emoji === emoji);
+  if (index < 0) return [...tally, { emoji, count: 1 }];
+
+  const next = [...tally];
+  next[index] = { emoji, count: next[index].count + 1 };
+  return next;
+}
 
 export default function PresenterMode({ pollId, onExit, showToast }) {
   const { t } = useTranslation();
@@ -20,17 +37,33 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
   const [aggregates, setAggregates] = useState([]);
   const [openAnswers, setOpenAnswers] = useState([]);
   const [wordCloud, setWordCloud] = useState({ questionIndex: 0, terms: [] });
+  const [scores, setScores] = useState([]);
   const [showQr, setShowQr] = useState(false);
-  const [activeTab, setActiveTab] = useState('chart');
+  // A tab the presenter picked, remembered only for as long as the session is
+  // in the same state — so ending a contest brings up the standings on its own.
+  const [tabChoice, setTabChoice] = useState(null);
   const [floatingReactions, setFloatingReactions] = useState([]);
+  const [reactionTally, setReactionTally] = useState([]);
   const reactionIdRef = useRef(0);
 
   const ct = (key) => t(`contentTypes.${key}.label`);
+
+  // Answers arrive one per participant, so a burst is the normal case. The list
+  // is reloaded once shortly after the flurry rather than once per answer.
+  const openAnswerReloadRef = useRef(null);
+  const scheduleOpenAnswerReload = useCallback(() => {
+    if (openAnswerReloadRef.current) return;
+    openAnswerReloadRef.current = setTimeout(() => {
+      openAnswerReloadRef.current = null;
+      voteService.allOpen(pollId).then(setOpenAnswers).catch(() => {});
+    }, 800);
+  }, [pollId]);
 
   useEffect(() => {
     if (!pollId) return;
     let active = true;
     pollService.get(pollId).then((p) => { if (active) setPoll(p); }).catch((e) => showToast(e.message, 'error'));
+    reactionService.tally(pollId).then((t) => { if (active) setReactionTally(t); }).catch(() => {});
 
     const unsubPromise = realtimeService.subscribe(pollId, {
       onPollUpdated: (p) => { if (active) setPoll((prev) => mergeAnswerKey(p, prev)); },
@@ -44,18 +77,37 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
         });
       },
       onWordCloudUpdated: (payload) => { if (active) setWordCloud(payload); },
-      onOpenAnswerSubmitted: () => { /* could trigger reload of open answers list */ },
+      onOpenAnswerSubmitted: () => { if (active) scheduleOpenAnswerReload(); },
+      onLeaderboardUpdated: (payload) => { if (active) setScores(payload.entries || []); },
       onReaction: (r) => {
         if (!active) return;
         const id = ++reactionIdRef.current;
         const x = Math.random() * 80 + 10;
         setFloatingReactions((prev) => [...prev, { id, emoji: r.emoji, x }]);
         setTimeout(() => setFloatingReactions((prev) => prev.filter((f) => f.id !== id)), 3000);
+        setReactionTally((prev) => bumpTally(prev, r.emoji));
       },
     });
 
-    return () => { active = false; unsubPromise.then((u) => u && u()); };
-  }, [pollId]);
+    return () => {
+      active = false;
+      unsubPromise.then((u) => u && u());
+      if (openAnswerReloadRef.current) clearTimeout(openAnswerReloadRef.current);
+    };
+  }, [pollId, scheduleOpenAnswerReload]);
+
+  // Only contests, quizzes and exams keep points, so only they have standings.
+  const statusKey = poll ? (POLL_STATUS_KEY[poll.status] || 'waiting') : 'waiting';
+  const typeKey = poll ? (POLL_TYPE_KEY[poll.type] || 'contest') : 'contest';
+  const typeCfg = CONTENT_TYPES[typeKey] || CONTENT_TYPES.contest;
+  const hasScores = typeCfg.hasCorrectAnswer;
+
+  // The hub pushes the standings after every scored answer; this is the first
+  // draw, and the redraw for a presenter who opens a session already in play.
+  useEffect(() => {
+    if (!pollId || !hasScores) return;
+    scoreService.leaderboard(pollId, LEADERBOARD_SIZE).then(setScores).catch(() => {});
+  }, [pollId, hasScores, statusKey]);
 
   // Refresh aggregates / open answers / wordcloud when question changes
   useEffect(() => {
@@ -86,12 +138,25 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
 
   if (!poll) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
 
-  const statusKey = POLL_STATUS_KEY[poll.status] || 'waiting';
-  const typeKey = POLL_TYPE_KEY[poll.type] || 'contest';
-  const typeCfg = CONTENT_TYPES[typeKey] || CONTENT_TYPES.contest;
   const qTypeKey = currentQ ? (QUESTION_TYPE_KEY[currentQ.questionType] || 'multiple') : 'multiple';
   const isWordCloud = qTypeKey === 'wordcloud';
   const isOpen = qTypeKey === 'open';
+
+  const activeTab = tabChoice?.status === statusKey
+    ? tabChoice.tab
+    : (statusKey === 'ended' && hasScores ? 'leaderboard' : 'chart');
+  const chooseTab = (tab) => setTabChoice({ status: statusKey, tab });
+
+  const handleScoreAnswer = async (answer, score) => {
+    try {
+      const graded = await voteService.scoreOpen(pollId, answer.id, score);
+      setOpenAnswers((prev) => prev.map((a) => (a.id === graded.id ? graded : a)));
+      showToast(t('grading.saved'));
+    } catch (e) {
+      showToast(e.message, 'error');
+      throw e;
+    }
+  };
 
   const handleActivate = async () => { try { setPoll(await pollService.activate(pollId)); showToast(t('presenter.started')); } catch (e) { showToast(e.message, 'error'); } };
   const handleNext = async () => { try { setPoll(await pollService.nextQuestion(pollId)); } catch (e) { showToast(e.message, 'error'); } };
@@ -111,6 +176,13 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {reactionTally.length > 0 && (
+            <span className="hidden sm:flex items-center gap-2 px-3 py-1 text-xs bg-white/10 rounded-full" title={t('presenter.reactions')}>
+              {reactionTally.slice(0, 4).map((r) => (
+                <span key={r.emoji}>{r.emoji} {r.count}</span>
+              ))}
+            </span>
+          )}
           <span className="px-3 py-1 text-xs bg-white/10 rounded-full">
             <Users size={14} className="inline -mt-0.5" /> {poll.participantCount}
           </span>
@@ -134,30 +206,37 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
               <h2 className="text-3xl font-bold">
                 {typeKey === 'exam' && currentQ.text.includes('$') ? <KatexText text={currentQ.text} /> : currentQ.text}
               </h2>
+              {/* A question whose picture only reached the phones was half a question. */}
+              {currentQ.imageUrl && (
+                <img
+                  src={currentQ.imageUrl}
+                  alt=""
+                  className="mt-4 max-h-64 rounded-xl shadow-lg object-contain bg-black/20"
+                />
+              )}
             </div>
 
             <div className="flex gap-2 mb-4">
-              <button onClick={() => setActiveTab('chart')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'chart' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><BarChart3 size={16} className="inline mr-1" /> {t('presenter.results')}</button>
-              {isOpen && <button onClick={() => setActiveTab('open')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'open' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><MessageSquare size={16} className="inline mr-1" /> {t('presenter.answers', { n: openAnswers.length })}</button>}
+              <button onClick={() => chooseTab('chart')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'chart' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><BarChart3 size={16} className="inline mr-1" /> {t('presenter.results')}</button>
+              {isOpen && <button onClick={() => chooseTab('open')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'open' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><MessageSquare size={16} className="inline mr-1" /> {t('presenter.answers', { n: openAnswers.length })}</button>}
+              {hasScores && <button onClick={() => chooseTab('leaderboard')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'leaderboard' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><Trophy size={16} className="inline mr-1" /> {t('presenter.leaderboard')}</button>}
             </div>
 
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 min-h-[400px]">
-              {isWordCloud ? (
+              {activeTab === 'leaderboard' ? (
+                <Leaderboard entries={scores} />
+              ) : isWordCloud ? (
                 <div className="h-[400px]">
                   <Suspense fallback={null}>
                     <WordCloudCanvas terms={wordCloud.terms} width={1000} height={400} />
                   </Suspense>
                 </div>
               ) : isOpen && activeTab === 'open' ? (
-                <ul className="space-y-2">
-                  {openAnswers.filter((a) => a.questionId === currentQ.id).map((a) => (
-                    <li key={a.id} className="bg-white/10 rounded-lg p-3">
-                      <div className="text-xs text-white/50 mb-1">{a.userName}</div>
-                      <div>{a.answerText}</div>
-                    </li>
-                  ))}
-                  {openAnswers.filter((a) => a.questionId === currentQ.id).length === 0 && <li className="text-white/40 italic">{t('presenter.noAnswers')}</li>}
-                </ul>
+                <OpenAnswerList
+                  answers={openAnswers.filter((a) => a.questionId === currentQ.id)}
+                  maxPoints={currentQ.points || 10}
+                  onScore={handleScoreAnswer}
+                />
               ) : (
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart data={chartData}>

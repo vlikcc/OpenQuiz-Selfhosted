@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useState, useEffect } from 'react';
-import { Trash2, Smartphone, Users, AlertTriangle, Copy, QrCode, Loader2, Edit2 } from 'lucide-react';
+import { Trash2, Smartphone, Users, AlertTriangle, Copy, CopyPlus, QrCode, Loader2, Edit2, BarChart3 } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_KEY } from '../config/constants';
 import { pollService } from '../services/pollService';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,9 @@ import LoadingPanel from './LoadingPanel';
 // The editor reaches the spreadsheet parsers and the KaTeX preview; the poll
 // list itself needs none of that.
 const PollForm = lazy(() => import('./PollForm'));
+// The report screen carries the charts and, behind its export buttons, the
+// spreadsheet and PDF writers.
+const ResultsAnalysis = lazy(() => import('./ResultsAnalysis'));
 
 export default function Dashboard({
   onNavigate,
@@ -28,6 +31,8 @@ export default function Dashboard({
   const [qrPoll, setQrPoll] = useState(null);
   // The list only carries summaries, so editing fetches the questions itself.
   const [editing, setEditing] = useState(null);
+  // The report screen needs the questions too: { id, poll } while it loads.
+  const [reporting, setReporting] = useState(null);
 
   const canCreateQuiz = isAdmin || isAuthorized;
 
@@ -86,6 +91,28 @@ export default function Dashboard({
     }
   };
 
+  const handleDuplicate = async (poll) => {
+    const title = t('dashboard.copyTitle', { title: poll.title || t('common.untitled') });
+    try {
+      const copy = await pollService.duplicate(poll.id, title);
+      showToast(t('dashboard.duplicated', { title: copy.title }));
+      // The list is newest first, so the copy lands at the top.
+      await loadPage(1);
+    } catch (err) {
+      showToast(err.message || t('dashboard.duplicateError'), 'error');
+    }
+  };
+
+  const handleShowResults = async (poll) => {
+    setReporting({ id: poll.id, poll: null });
+    try {
+      setReporting({ id: poll.id, poll: await pollService.get(poll.id) });
+    } catch (err) {
+      setReporting(null);
+      showToast(err.message || t('dashboard.loadError'), 'error');
+    }
+  };
+
   const handleSaved = async () => {
     setComposer(null);
     await loadPage(1);
@@ -97,6 +124,16 @@ export default function Dashboard({
     <div className="w-full h-full flex flex-col overflow-hidden bg-slate-50">
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 custom-scrollbar">
         {qrPoll && <QrModal pollId={qrPoll.id} title={qrPoll.title} onClose={() => setQrPoll(null)} />}
+
+        {reporting && (
+          reporting.poll ? (
+            <Suspense fallback={<LoadingPanel />}>
+              <ResultsAnalysis poll={reporting.poll} pollId={reporting.id} onClose={() => setReporting(null)} />
+            </Suspense>
+          ) : (
+            <LoadingPanel />
+          )
+        )}
 
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
@@ -157,6 +194,7 @@ export default function Dashboard({
                     <div className="flex gap-1">
                       <button aria-label={t('dashboard.showQr')} onClick={() => setQrPoll(poll)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"><QrCode size={16} /></button>
                       {canDelete && <button aria-label={t('common.delete')} onClick={() => handleDeletePoll(poll)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>}
+                      {canCreateQuiz && <button aria-label={t('dashboard.duplicate')} onClick={() => handleDuplicate(poll)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"><CopyPlus size={16} /></button>}
                       {canDelete && <button aria-label={t('common.edit')} onClick={() => setComposer({ contentType: tk, pollId: poll.id })} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={16} /></button>}
                     </div>
                   </div>
@@ -166,10 +204,11 @@ export default function Dashboard({
                     <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-bold">{t('dashboard.questionCount', { count: poll.questionCount || 0 })}</span>
                     {poll.creatorEmail && isAdmin && <span className="text-xs text-slate-400 truncate max-w-[150px]">• {poll.creatorEmail.split('@')[0]}</span>}
                   </p>
-                  <div className="mt-auto grid grid-cols-2 gap-2">
-                    <button onClick={() => onNavigate('presenter', poll.id)} className="col-span-2 py-2 bg-slate-900 text-white rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-slate-800 text-sm"><Users size={16} /> {t('dashboard.manage')}</button>
+                  <div className="mt-auto grid grid-cols-3 gap-2">
+                    <button onClick={() => onNavigate('presenter', poll.id)} className="col-span-3 py-2 bg-slate-900 text-white rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-slate-800 text-sm"><Users size={16} /> {t('dashboard.manage')}</button>
                     <button onClick={() => copyToClipboard(poll.id)} className="py-2 border border-slate-200 text-slate-600 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 text-xs"><Copy size={14} /> ID</button>
                     <button onClick={() => onNavigate('voter', poll.id)} className="py-2 border border-slate-200 text-slate-600 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 text-xs"><Smartphone size={14} /> {t('dashboard.test')}</button>
+                    <button onClick={() => handleShowResults(poll)} className="py-2 border border-slate-200 text-slate-600 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 text-xs"><BarChart3 size={14} /> {t('dashboard.results')}</button>
                   </div>
                 </div>
               );

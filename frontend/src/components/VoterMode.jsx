@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { CheckCircle2, XCircle, Loader2, Send } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { CheckCircle2, XCircle, Loader2, Send, TimerOff } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_KEY, POLL_STATUS_KEY, QUESTION_TYPE_KEY } from '../config/constants';
 import { pollService } from '../services/pollService';
 import { voteService } from '../services/voteService';
@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import KatexText from './KatexText';
 import WaitingRoom from './WaitingRoom';
 import WordCloudVoter from './wordcloud/WordCloudVoter';
+import { clockOffsetMs, deadlineFor, secondsLeft } from '../utils/questionClock';
 
 export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
   const { t } = useTranslation();
@@ -23,10 +24,13 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
   const [lastResult, setLastResult] = useState(null);
   const [openAnswer, setOpenAnswer] = useState('');
   const [selectedIndices, setSelectedIndices] = useState([]);
-  const [timeLeft, setTimeLeft] = useState(30);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  // The server decides when a question closes; this only tracks how far the
+  // local clock is from the server's so the countdown agrees with that decision.
+  const [clockOffset, setClockOffset] = useState(0);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const votedQuestionsRef = useRef(new Set());
+  const wordCloudDraftRef = useRef([]);
   // The SignalR subscription below is created once per poll, so its handler
   // cannot read `currentQIndex` from state without capturing a stale value.
   const currentQIndexRef = useRef(currentQIndex);
@@ -46,9 +50,8 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
     pollService.get(pollId).then((p) => {
       if (active && p) {
         setPoll(p);
+        setClockOffset(clockOffsetMs(p));
         goToQuestion(p.currentQuestionIndex ?? 0);
-        const q = p.questions?.[p.currentQuestionIndex ?? 0];
-        if (q) { setTimeLeft(q.timeLimit || 30); setIsTimerRunning(true); }
       }
     }).catch(console.error);
 
@@ -56,10 +59,9 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
       onPollUpdated: (p) => {
         if (!active) return;
         setPoll(p);
+        setClockOffset(clockOffsetMs(p));
         const newQ = p.currentQuestionIndex ?? 0;
         if (newQ !== currentQIndexRef.current) {
-          const q = p.questions?.[newQ];
-          if (q) { setTimeLeft(q.timeLimit || 30); setIsTimerRunning(true); }
           goToQuestion(newQ);
           const key = `${pollId}_${newQ}`;
           const voted = votedQuestionsRef.current.has(key);
@@ -69,6 +71,7 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
             setStartTime(Date.now());
             setOpenAnswer('');
             setSelectedIndices([]);
+            wordCloudDraftRef.current = [];
           }
         }
       },
@@ -77,13 +80,21 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
     return () => { active = false; unsubP.then((u) => u && u()); };
   }, [pollId, goToQuestion]);
 
+  const activeQuestion = poll?.questions?.[currentQIndex];
+  const deadline = useMemo(
+    () => deadlineFor(poll, activeQuestion, clockOffset),
+    [poll, activeQuestion, clockOffset],
+  );
+  const timeLeft = secondsLeft(deadline, nowMs);
+
   useEffect(() => {
-    let interval;
-    if (isTimerRunning && timeLeft > 0 && !hasVotedForCurrent) {
-      interval = setInterval(() => setTimeLeft((t) => t - 1), 1000);
-    }
+    if (deadline === null || hasVotedForCurrent) return undefined;
+
+    // Faster than once a second so the bar does not visibly stall, and so the
+    // hand-off to the auto-submit below happens close to the real deadline.
+    const interval = setInterval(() => setNowMs(Date.now()), 250);
     return () => clearInterval(interval);
-  }, [isTimerRunning, timeLeft, hasVotedForCurrent]);
+  }, [deadline, hasVotedForCurrent]);
 
   const handleStart = useCallback(async (e) => {
     e.preventDefault();
@@ -135,7 +146,7 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
     submitVote(selectedIndices);
   };
 
-  const handleOpenAnswer = async () => {
+  const handleOpenAnswer = useCallback(async () => {
     if (isSubmitting || hasVotedForCurrent || !openAnswer.trim()) return;
     setIsSubmitting(true);
     try {
@@ -149,9 +160,9 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, hasVotedForCurrent, openAnswer, pollId, currentQIndex, userName, showToast, t]);
 
-  const handleWordCloudSubmit = async (terms) => {
+  const handleWordCloudSubmit = useCallback(async (terms) => {
     setIsSubmitting(true);
     try {
       await wordcloudService.submit(pollId, { questionIndex: currentQIndex, terms, userName });
@@ -163,7 +174,43 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [pollId, currentQIndex, userName, showToast, t]);
+
+  const noteWordCloudDraft = useCallback((terms) => { wordCloudDraftRef.current = terms; }, []);
+
+  /**
+   * The server stops accepting answers the moment the question's time is up, so
+   * whatever the participant had entered is sent for them rather than lost. With
+   * nothing entered the question simply closes.
+   */
+  const handleExpiry = useCallback(() => {
+    const question = poll?.questions?.[currentQIndex];
+    const questionType = question ? QUESTION_TYPE_KEY[question.questionType] : null;
+
+    if (questionType === 'open' && openAnswer.trim()) return handleOpenAnswer();
+    if (questionType === 'wordcloud' && wordCloudDraftRef.current.length > 0) {
+      return handleWordCloudSubmit(wordCloudDraftRef.current);
+    }
+    if (questionType !== 'open' && questionType !== 'wordcloud' && selectedIndices.length > 0) {
+      return submitVote(selectedIndices);
+    }
+
+    votedQuestionsRef.current.add(`${pollId}_${currentQIndex}`);
+    setHasVotedForCurrent(true);
+    setLastResult('timeout');
+    return undefined;
+  }, [poll, currentQIndex, openAnswer, selectedIndices, pollId, handleOpenAnswer, handleWordCloudSubmit, submitVote]);
+
+  const expired = timeLeft === 0;
+  const handledExpiryRef = useRef(null);
+
+  useEffect(() => {
+    const key = `${pollId}_${currentQIndex}`;
+    if (!expired || hasVotedForCurrent || isSubmitting || handledExpiryRef.current === key) return;
+
+    handledExpiryRef.current = key;
+    handleExpiry();
+  }, [expired, hasVotedForCurrent, isSubmitting, pollId, currentQIndex, handleExpiry]);
 
   const handleReaction = (emoji) => reactionService.send(pollId, emoji, userName).catch(() => {});
 
@@ -194,6 +241,19 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
   }
 
   if (hasVotedForCurrent) {
+    if (lastResult === 'timeout') {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 text-white text-center bg-slate-600">
+          <div className="bg-white/20 backdrop-blur-md p-10 rounded-3xl shadow-2xl">
+            <TimerOff size={64} className="mx-auto mb-4" />
+            <h2 className="text-4xl font-black mb-2">{t('voter.timeUp')}</h2>
+            <div className="flex items-center justify-center gap-2 bg-black/20 px-4 py-2 rounded-full text-sm font-medium animate-pulse">
+              <Loader2 size={16} className="animate-spin" /> {t('voter.waitingForNext')}
+            </div>
+          </div>
+        </div>
+      );
+    }
     if (lastResult === 'voted' || lastResult === 'submitted') {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center p-6 text-white text-center bg-indigo-500">
@@ -249,16 +309,24 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
           {isExam && q.text.includes('$') ? <KatexText text={q.text} /> : q.text}
         </div>
 
-        {!hasVotedForCurrent && !isWordCloud && (
-          <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div className={`h-full transition-all duration-1000 ease-linear ${timeLeft < 10 ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${(timeLeft / (q.timeLimit || 30)) * 100}%` }}></div>
+        {!hasVotedForCurrent && timeLeft !== null && (
+          <div className="mt-4">
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ease-linear ${timeLeft < 10 ? 'bg-red-500' : 'bg-indigo-500'}`}
+                style={{ width: `${Math.min(100, (timeLeft / q.timeLimit) * 100)}%` }}
+              />
+            </div>
+            <div className={`mt-1 text-right text-xs font-bold ${timeLeft < 10 ? 'text-red-500' : 'text-slate-400'}`}>
+              {t('voter.secondsLeft', { n: timeLeft })}
+            </div>
           </div>
         )}
       </div>
 
       <div className="flex-1 p-4 sm:p-6 space-y-2 overflow-y-auto custom-scrollbar">
         {isWordCloud ? (
-          <WordCloudVoter maxWords={q.maxWords || 3} isSubmitting={isSubmitting} onSubmit={handleWordCloudSubmit} />
+          <WordCloudVoter maxWords={q.maxWords || 3} isSubmitting={isSubmitting} onSubmit={handleWordCloudSubmit} onDraftChange={noteWordCloudDraft} />
         ) : isOpen ? (
           <div className="space-y-4">
             <textarea

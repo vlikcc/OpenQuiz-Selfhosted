@@ -7,6 +7,9 @@ export const pollService = {
   get: (id) => api.get(`/api/polls/${id}`, { auth: false }),
   create: (data) => api.post('/api/polls', data),
   update: (id, data) => api.put(`/api/polls/${id}`, data),
+
+  /** A fresh, unplayed copy of a poll, for running it with another group. */
+  duplicate: (id, title) => api.post(`/api/polls/${id}/duplicate`, { title }),
   remove: (id) => api.delete(`/api/polls/${id}`),
   activate: (id) => api.post(`/api/polls/${id}/activate`),
   nextQuestion: (id) => api.post(`/api/polls/${id}/next-question`),

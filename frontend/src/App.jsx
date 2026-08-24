@@ -15,6 +15,8 @@ import AuthScreen from './components/AuthScreen';
 import ProfileScreen from './components/ProfileScreen';
 import LandingPage from './components/LandingPage';
 import LoadingPanel from './components/LoadingPanel';
+import ResetPasswordScreen from './components/ResetPasswordScreen';
+import { isPasswordResetPath, resetTokenFromSearch } from './utils/resetRoute';
 
 // The presenter pulls in the charting stack and the admin panel is reachable by
 // a handful of accounts, so neither belongs in the bundle every voter downloads.
@@ -87,6 +89,9 @@ export default function App() {
   // composed: { contentType, pollId } with a null pollId for a new one.
   const [composer, setComposer] = useState(null);
   const [showLandingPage, setShowLandingPage] = useState(true);
+  // The reset e-mail lands on this same SPA; once the form is done we drop
+  // the path so the next render is the ordinary landing / sign-in screen.
+  const [leaveReset, setLeaveReset] = useState(false);
 
   // QR voter preload
   useEffect(() => {
@@ -147,6 +152,21 @@ export default function App() {
   const handlePasswordReset = async (email) => {
     await authService.passwordResetRequest(email);
   };
+
+  if (isPasswordResetPath(window.location.pathname) && !leaveReset) {
+    return (
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
+        <ResetPasswordScreen
+          token={resetTokenFromSearch(window.location.search)}
+          onFinished={() => {
+            window.history.replaceState({}, '', '/');
+            setLeaveReset(true);
+            setShowLandingPage(false);
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
 
   // QR Voter Mode
   if (isVoterMode && initialPollId) {

@@ -4,6 +4,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Application.Common;
+using OpenQuiz.Application.Realtime;
 using OpenQuiz.Application.Votes;
 using OpenQuiz.Domain.Entities;
 using OpenQuiz.Domain.Enums;
@@ -16,6 +17,7 @@ public class VoteService : IVoteService
     private readonly OpenQuizDbContext _db;
     private readonly ICurrentUser _user;
     private readonly IRealtimeNotifier _realtime;
+    private readonly IScoreService _scores;
     private readonly IValidator<SubmitVoteRequest> _vv;
     private readonly IValidator<SubmitOpenAnswerRequest> _ov;
 
@@ -23,21 +25,25 @@ public class VoteService : IVoteService
         OpenQuizDbContext db,
         ICurrentUser user,
         IRealtimeNotifier realtime,
+        IScoreService scores,
         IValidator<SubmitVoteRequest> vv,
         IValidator<SubmitOpenAnswerRequest> ov)
     {
-        _db = db; _user = user; _realtime = realtime; _vv = vv; _ov = ov;
+        _db = db; _user = user; _realtime = realtime; _scores = scores; _vv = vv; _ov = ov;
     }
 
     public async Task<VoteDto> SubmitAsync(Guid pollId, SubmitVoteRequest req, CancellationToken ct)
     {
         await _vv.ValidateAndThrowAsync(req, ct);
 
+        var now = DateTime.UtcNow;
+
         var poll = await _db.Polls.Include(p => p.Questions)
             .FirstOrDefaultAsync(p => p.Id == pollId, ct)
             ?? throw Errors.NotFound("Poll");
 
-        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex);
+        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex, now);
+        var elapsedMs = PollParticipation.ElapsedMs(poll, now, req.ResponseTimeMs);
 
         var voterKey = VoterKeyFor(req.UserName);
         var alreadyVoted = await _db.Votes
@@ -59,8 +65,8 @@ public class VoteService : IVoteService
             VoterKey = voterKey,
             SelectedOptionIndices = JsonSerializer.Serialize(req.SelectedIndices),
             IsCorrect = isCorrect,
-            ResponseTimeMs = req.ResponseTimeMs,
-            CreatedAt = DateTime.UtcNow
+            ResponseTimeMs = elapsedMs,
+            CreatedAt = now
         };
         _db.Votes.Add(vote);
 
@@ -77,7 +83,7 @@ public class VoteService : IVoteService
         }
 
         if (isCorrect == true)
-            await AwardPointsAsync(poll.Id, vote.UserName, question.Points, req.ResponseTimeMs ?? 0, ct);
+            await AwardPointsAsync(poll.Id, vote.UserName, question.Points, elapsedMs, ct);
 
         // Recompute aggregate for this question and notify.
         var thisQ = await SingleQuestionAggregateAsync(poll.Id, question.Id, req.QuestionIndex, ct);
@@ -91,11 +97,13 @@ public class VoteService : IVoteService
     {
         await _ov.ValidateAndThrowAsync(req, ct);
 
+        var now = DateTime.UtcNow;
+
         var poll = await _db.Polls.Include(p => p.Questions)
             .FirstOrDefaultAsync(p => p.Id == pollId, ct)
             ?? throw Errors.NotFound("Poll");
 
-        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex);
+        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex, now);
 
         var entity = new OpenAnswer
         {
@@ -104,7 +112,7 @@ public class VoteService : IVoteService
             UserId = _user.UserId,
             UserName = req.UserName.Trim(),
             AnswerText = req.AnswerText,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now
         };
         _db.OpenAnswers.Add(entity);
         await _db.SaveChangesAsync(ct);
@@ -151,6 +159,39 @@ public class VoteService : IVoteService
         return new PagedResult<OpenAnswerDto>(items, page.Page, page.PageSize, total);
     }
 
+    /// <summary>
+    /// Open-ended answers carry no points until somebody reads them, so an exam
+    /// used to end with the written half missing from the leaderboard. Grading
+    /// moves the difference, which makes correcting a grade safe.
+    /// </summary>
+    public async Task<OpenAnswerDto> ScoreOpenAsync(
+        Guid pollId, Guid answerId, ScoreOpenAnswerRequest req, CancellationToken ct)
+    {
+        EnsureOwnerAccess(pollId);
+
+        var answer = await _db.OpenAnswers.FirstOrDefaultAsync(a => a.Id == answerId && a.PollId == pollId, ct)
+                     ?? throw Errors.NotFound("Answer");
+
+        var maxPoints = await _db.Questions.AsNoTracking()
+            .Where(q => q.Id == answer.QuestionId)
+            .Select(q => (int?)q.Points)
+            .FirstOrDefaultAsync(ct)
+            ?? throw Errors.NotFound("Question");
+
+        if (req.Score is int score && (score < 0 || score > maxPoints))
+            throw Errors.Validation($"Score must be between 0 and {maxPoints}.");
+
+        var delta = (req.Score ?? 0) - (answer.Score ?? 0);
+        answer.Score = req.Score;
+        await _db.SaveChangesAsync(ct);
+
+        if (delta != 0)
+            await AwardPointsAsync(pollId, answer.UserName, delta, elapsedMs: 0, ct);
+
+        return new OpenAnswerDto(
+            answer.Id, answer.QuestionId, answer.UserName, answer.AnswerText, answer.Score, answer.CreatedAt);
+    }
+
     public async Task<List<QuestionAggregate>> AggregatesAsync(Guid pollId, CancellationToken ct)
     {
         var poll = await _db.Polls.Include(p => p.Questions).AsNoTracking()
@@ -184,9 +225,20 @@ public class VoteService : IVoteService
 
     /// <summary>
     /// Adds to a running total, so two answers scored at the same moment do not
-    /// overwrite each other.
+    /// overwrite each other, and tells the room where it now stands.
     /// </summary>
-    private Task AwardPointsAsync(Guid pollId, string userName, int points, int elapsedMs, CancellationToken ct)
+    private async Task AwardPointsAsync(Guid pollId, string userName, int points, int elapsedMs, CancellationToken ct)
+    {
+        await AccumulateAsync(pollId, userName, points, elapsedMs, ct);
+
+        var standings = await _scores.LeaderboardAsync(pollId, LeaderboardSize, ct);
+        await _realtime.LeaderboardUpdatedAsync(pollId, new LeaderboardUpdate(standings));
+    }
+
+    /// <summary>How much of the table a live screen shows.</summary>
+    private const int LeaderboardSize = 10;
+
+    private Task AccumulateAsync(Guid pollId, string userName, int points, int elapsedMs, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
 
