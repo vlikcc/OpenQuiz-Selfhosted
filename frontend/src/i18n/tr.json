@@ -254,6 +254,14 @@
     "pdfTime": "Süre (ms)",
     "sheetScores": "Skorlar"
   },
+  "grading": {
+    "score": "Puan",
+    "outOf": "/ {{max}}",
+    "award": "Puanı kaydet",
+    "clear": "Puanı sil",
+    "scored": "{{score}}/{{max}} puan",
+    "saved": "Puan kaydedildi"
+  },
   "moderation": {
     "title": "Kelime bulutu moderasyonu",
     "summary": "En çok {{top}} kelime · {{blocked}} yasaklı",

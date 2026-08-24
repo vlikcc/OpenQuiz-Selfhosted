@@ -35,6 +35,12 @@ public class VotesController : ControllerBase
     public async Task<ActionResult<PagedResult<OpenAnswerDto>>> ListOpen(Guid pollId, [FromQuery] PageRequest paging, CancellationToken ct)
         => Ok(await _votes.ListOpenAsync(pollId, paging, ct));
 
+    [Authorize]
+    [HttpPut("open-answers/{answerId:guid}/score")]
+    public async Task<ActionResult<OpenAnswerDto>> ScoreOpen(
+        Guid pollId, Guid answerId, [FromBody] ScoreOpenAnswerRequest req, CancellationToken ct)
+        => Ok(await _votes.ScoreOpenAsync(pollId, answerId, req, ct));
+
     [EnableRateLimiting(RateLimitPolicies.Participation)]
     [HttpGet("aggregates")]
     public async Task<ActionResult<List<QuestionAggregate>>> Aggregates(Guid pollId, CancellationToken ct)

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
 import { Home, QrCode, Users, Loader2, ChevronRight, ChevronLeft, BarChart3, MessageSquare, Play, Square } from 'lucide-react';
 import { COLORS, CONTENT_TYPES, POLL_TYPE_KEY, POLL_STATUS_KEY, QUESTION_TYPE_KEY } from '../config/constants';
@@ -9,6 +9,7 @@ import { realtimeService } from '../services/realtimeService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import KatexText from './KatexText';
+import OpenAnswerList from './OpenAnswerList';
 import { mergeAnswerKey } from '../utils/pollAnswers';
 
 // d3's layout solver is only needed by word cloud questions.
@@ -27,6 +28,17 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
 
   const ct = (key) => t(`contentTypes.${key}.label`);
 
+  // Answers arrive one per participant, so a burst is the normal case. The list
+  // is reloaded once shortly after the flurry rather than once per answer.
+  const openAnswerReloadRef = useRef(null);
+  const scheduleOpenAnswerReload = useCallback(() => {
+    if (openAnswerReloadRef.current) return;
+    openAnswerReloadRef.current = setTimeout(() => {
+      openAnswerReloadRef.current = null;
+      voteService.allOpen(pollId).then(setOpenAnswers).catch(() => {});
+    }, 800);
+  }, [pollId]);
+
   useEffect(() => {
     if (!pollId) return;
     let active = true;
@@ -44,7 +56,7 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
         });
       },
       onWordCloudUpdated: (payload) => { if (active) setWordCloud(payload); },
-      onOpenAnswerSubmitted: () => { /* could trigger reload of open answers list */ },
+      onOpenAnswerSubmitted: () => { if (active) scheduleOpenAnswerReload(); },
       onReaction: (r) => {
         if (!active) return;
         const id = ++reactionIdRef.current;
@@ -54,8 +66,12 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
       },
     });
 
-    return () => { active = false; unsubPromise.then((u) => u && u()); };
-  }, [pollId]);
+    return () => {
+      active = false;
+      unsubPromise.then((u) => u && u());
+      if (openAnswerReloadRef.current) clearTimeout(openAnswerReloadRef.current);
+    };
+  }, [pollId, scheduleOpenAnswerReload]);
 
   // Refresh aggregates / open answers / wordcloud when question changes
   useEffect(() => {
@@ -92,6 +108,17 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
   const qTypeKey = currentQ ? (QUESTION_TYPE_KEY[currentQ.questionType] || 'multiple') : 'multiple';
   const isWordCloud = qTypeKey === 'wordcloud';
   const isOpen = qTypeKey === 'open';
+
+  const handleScoreAnswer = async (answer, score) => {
+    try {
+      const graded = await voteService.scoreOpen(pollId, answer.id, score);
+      setOpenAnswers((prev) => prev.map((a) => (a.id === graded.id ? graded : a)));
+      showToast(t('grading.saved'));
+    } catch (e) {
+      showToast(e.message, 'error');
+      throw e;
+    }
+  };
 
   const handleActivate = async () => { try { setPoll(await pollService.activate(pollId)); showToast(t('presenter.started')); } catch (e) { showToast(e.message, 'error'); } };
   const handleNext = async () => { try { setPoll(await pollService.nextQuestion(pollId)); } catch (e) { showToast(e.message, 'error'); } };
@@ -149,15 +176,11 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
                   </Suspense>
                 </div>
               ) : isOpen && activeTab === 'open' ? (
-                <ul className="space-y-2">
-                  {openAnswers.filter((a) => a.questionId === currentQ.id).map((a) => (
-                    <li key={a.id} className="bg-white/10 rounded-lg p-3">
-                      <div className="text-xs text-white/50 mb-1">{a.userName}</div>
-                      <div>{a.answerText}</div>
-                    </li>
-                  ))}
-                  {openAnswers.filter((a) => a.questionId === currentQ.id).length === 0 && <li className="text-white/40 italic">{t('presenter.noAnswers')}</li>}
-                </ul>
+                <OpenAnswerList
+                  answers={openAnswers.filter((a) => a.questionId === currentQ.id)}
+                  maxPoints={currentQ.points || 10}
+                  onScore={handleScoreAnswer}
+                />
               ) : (
                 <ResponsiveContainer width="100%" height={400}>
                   <BarChart data={chartData}>

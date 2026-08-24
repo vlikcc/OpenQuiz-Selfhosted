@@ -80,6 +80,11 @@ questions and options.
 | POST | `/api/polls/{id}/open-answers` | — | `{ questionIndex, answerText, userName }` |
 | GET | `/api/polls/{id}/votes` | bearer (owner/admin) — paged |
 | GET | `/api/polls/{id}/open-answers` | bearer (owner/admin) — paged |
+| PUT | `/api/polls/{id}/open-answers/{answerId}/score` | bearer (owner/admin) — `{ score }` |
+
+Grading a written answer moves the difference onto the poll's leaderboard, so a
+corrected grade replaces the earlier one and `{ "score": null }` takes the points
+back. A grade above the question's `points` is a `400`.
 | GET | `/api/polls/{id}/aggregates` | — | Per-question option counts |
 
 ## Word Cloud

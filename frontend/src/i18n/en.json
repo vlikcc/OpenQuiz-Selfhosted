@@ -254,6 +254,14 @@
     "pdfTime": "Time (ms)",
     "sheetScores": "Scores"
   },
+  "grading": {
+    "score": "Score",
+    "outOf": "/ {{max}}",
+    "award": "Save the score",
+    "clear": "Clear the score",
+    "scored": "{{score}}/{{max}} points",
+    "saved": "Score saved"
+  },
   "moderation": {
     "title": "Word cloud moderation",
     "summary": "Top {{top}} · {{blocked}} blocked",

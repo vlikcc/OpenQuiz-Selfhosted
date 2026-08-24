@@ -156,6 +156,39 @@ public class VoteService : IVoteService
         return new PagedResult<OpenAnswerDto>(items, page.Page, page.PageSize, total);
     }
 
+    /// <summary>
+    /// Open-ended answers carry no points until somebody reads them, so an exam
+    /// used to end with the written half missing from the leaderboard. Grading
+    /// moves the difference, which makes correcting a grade safe.
+    /// </summary>
+    public async Task<OpenAnswerDto> ScoreOpenAsync(
+        Guid pollId, Guid answerId, ScoreOpenAnswerRequest req, CancellationToken ct)
+    {
+        EnsureOwnerAccess(pollId);
+
+        var answer = await _db.OpenAnswers.FirstOrDefaultAsync(a => a.Id == answerId && a.PollId == pollId, ct)
+                     ?? throw Errors.NotFound("Answer");
+
+        var maxPoints = await _db.Questions.AsNoTracking()
+            .Where(q => q.Id == answer.QuestionId)
+            .Select(q => (int?)q.Points)
+            .FirstOrDefaultAsync(ct)
+            ?? throw Errors.NotFound("Question");
+
+        if (req.Score is int score && (score < 0 || score > maxPoints))
+            throw Errors.Validation($"Score must be between 0 and {maxPoints}.");
+
+        var delta = (req.Score ?? 0) - (answer.Score ?? 0);
+        answer.Score = req.Score;
+        await _db.SaveChangesAsync(ct);
+
+        if (delta != 0)
+            await AwardPointsAsync(pollId, answer.UserName, delta, elapsedMs: 0, ct);
+
+        return new OpenAnswerDto(
+            answer.Id, answer.QuestionId, answer.UserName, answer.AnswerText, answer.Score, answer.CreatedAt);
+    }
+
     public async Task<List<QuestionAggregate>> AggregatesAsync(Guid pollId, CancellationToken ct)
     {
         var poll = await _db.Polls.Include(p => p.Questions).AsNoTracking()
