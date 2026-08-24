@@ -254,6 +254,17 @@
     "pdfTime": "Süre (ms)",
     "sheetScores": "Skorlar"
   },
+  "moderation": {
+    "title": "Kelime bulutu moderasyonu",
+    "summary": "En çok {{top}} kelime · {{blocked}} yasaklı",
+    "blacklist": "Yasaklı kelimeler",
+    "blacklistPlaceholder": "reklam, spam",
+    "blacklistHint": "Virgülle ayırın. Bu kelimeler ne kabul edilir ne de ekranda kalır.",
+    "topN": "Ekrandaki kelime",
+    "topNHint": "Buluta kaç kelime sığsın? Geri kalanlar kayda geçmeye devam eder.",
+    "profanityFilter": "Yerleşik küfür filtresini uygula",
+    "allowRepeats": "Aynı kişi aynı kelimeyi birden fazla gönderebilsin"
+  },
   "contentTypes": {
     "contest": {
       "label": "Yarışma",

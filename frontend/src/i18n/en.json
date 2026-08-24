@@ -254,6 +254,17 @@
     "pdfTime": "Time (ms)",
     "sheetScores": "Scores"
   },
+  "moderation": {
+    "title": "Word cloud moderation",
+    "summary": "Top {{top}} · {{blocked}} blocked",
+    "blacklist": "Blocked words",
+    "blacklistPlaceholder": "ad, spam",
+    "blacklistHint": "Separate with commas. These are neither accepted nor left on screen.",
+    "topN": "Words on screen",
+    "topNHint": "How many words the cloud shows. The rest are still recorded.",
+    "profanityFilter": "Apply the built-in profanity filter",
+    "allowRepeats": "Let one person send the same word more than once"
+  },
   "contentTypes": {
     "contest": {
       "label": "Contest",

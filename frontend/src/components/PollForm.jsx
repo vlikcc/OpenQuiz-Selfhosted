@@ -5,13 +5,18 @@ import { pollService } from '../services/pollService';
 import { useTranslation } from 'react-i18next';
 import KatexText, { KatexTextEditor } from './KatexText';
 import { KATEX_EXAMPLES } from '../config/katexExamples';
+import { DEFAULT_MODERATION, parseModeration, toWordCloudConfig } from '../utils/wordCloudSettings';
+import WordCloudModeration from './wordcloud/WordCloudModeration';
 
 // Carries the spreadsheet and Word parsers, and most polls are typed by hand.
 const FileImport = lazy(() => import('./FileImport'));
 
 const blankMultiple = () => ({ text: '', options: ['', ''], correctIndex: 0, questionType: 'multiple', correctAnswer: '', image: '', timeLimit: 30 });
 const blankOpen = () => ({ text: '', questionType: 'open', correctAnswer: '', points: 10, image: '', timeLimit: 30 });
-const blankWordCloud = () => ({ text: '', questionType: 'wordcloud', image: '', timeLimit: 60, maxWords: 3 });
+const blankWordCloud = () => ({
+  text: '', questionType: 'wordcloud', image: '', timeLimit: 60, maxWords: 3,
+  moderation: { ...DEFAULT_MODERATION },
+});
 
 const blankFor = (contentType) => {
   const questionType = CONTENT_TYPES[contentType].questionType;
@@ -24,7 +29,7 @@ const draftFromPoll = (poll) => {
   const questions = (poll.questions || []).map((q) => {
     const qt = QUESTION_TYPE_KEY[q.questionType] || 'multiple';
     if (qt === 'open') return { text: q.text, questionType: 'open', correctAnswer: q.correctAnswer || '', points: q.points || 10, image: q.imageUrl || '', timeLimit: q.timeLimit || 30 };
-    if (qt === 'wordcloud') return { text: q.text, questionType: 'wordcloud', image: q.imageUrl || '', timeLimit: q.timeLimit || 60, maxWords: q.maxWords || 3 };
+    if (qt === 'wordcloud') return { text: q.text, questionType: 'wordcloud', image: q.imageUrl || '', timeLimit: q.timeLimit || 60, maxWords: q.maxWords || 3, moderation: parseModeration(q.wordCloudConfig) };
     return {
       text: q.text,
       questionType: 'multiple',
@@ -123,7 +128,7 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
         correctAnswer: q.correctAnswer || null,
         points: q.points || 10,
         maxWords: q.questionType === 'wordcloud' ? (q.maxWords || 3) : null,
-        wordCloudConfig: null,
+        wordCloudConfig: q.questionType === 'wordcloud' ? toWordCloudConfig(q.moderation) : null,
         options: q.questionType === 'multiple'
           ? (q.options || []).map((optText, optIdx) => ({ orderIndex: optIdx, text: optText }))
           : [],
@@ -252,8 +257,15 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
                 <KatexTextEditor value={q.correctAnswer || ''} onChange={(val) => updateField(qIndex, 'correctAnswer', val)} placeholder={t('dashboard.expectedAnswerPlaceholder')} rows={2} />
               </div>
             ) : q.questionType === 'wordcloud' ? (
-              <div className="text-sm text-slate-500 italic bg-sky-50 border border-sky-200 rounded-lg p-3">
-                {t('dashboard.wordcloudHint', { max: q.maxWords || 3 })}
+              <div className="space-y-3">
+                <div className="text-sm text-slate-500 italic bg-sky-50 border border-sky-200 rounded-lg p-3">
+                  {t('dashboard.wordcloudHint', { max: q.maxWords || 3 })}
+                </div>
+                <WordCloudModeration
+                  index={qIndex}
+                  moderation={q.moderation || DEFAULT_MODERATION}
+                  onChange={(next) => updateField(qIndex, 'moderation', next)}
+                />
               </div>
             ) : (
               <div className="space-y-4">

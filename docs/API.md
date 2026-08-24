@@ -87,9 +87,33 @@ questions and options.
 | Method | Path | Auth |
 |---|---|---|
 | POST | `/api/polls/{id}/wordcloud/submit` | — | `{ questionIndex, terms[], userName }` |
-| GET | `/api/polls/{id}/wordcloud/{questionIndex}?topN=50` | — |
+| GET | `/api/polls/{id}/wordcloud/{questionIndex}?topN=` | — | `topN` defaults to the question's own setting |
 
 Terms are normalized server-side (lowercase, trim, regex filter) and de-duplicated.
+
+### Moderation
+
+Each word cloud question carries its own moderation as JSON in
+`question.wordCloudConfig`. Every field is optional and an unreadable config
+falls back to the defaults rather than failing a live submission.
+
+```json
+{
+  "maxWordsPerUser": 3,
+  "minTermLength": 2,
+  "maxTermLength": 64,
+  "blacklist": ["spam"],
+  "topN": 50,
+  "allowDuplicatesFromSameUser": false,
+  "profanityFilter": true
+}
+```
+
+- `blacklist` and the built-in profanity list are applied to submissions *and* to
+  what `GET` returns, so blocking a word mid-session also clears it from the wall.
+- A submission whose every term is blocked is a `400`; one whose every term the
+  same participant already sent is a `409`.
+- `maxWordsPerUser` is only consulted when the question has no `maxWords`.
 
 ## Scores & Users
 

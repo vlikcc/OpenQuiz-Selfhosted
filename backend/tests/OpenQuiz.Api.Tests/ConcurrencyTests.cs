@@ -108,9 +108,9 @@ public class ConcurrencyTests(SqlServerFixture sql) : ApiTestBase(sql)
     }
 
     [Fact]
-    public async Task Repeating_a_term_within_one_submission_counts_every_mention()
+    public async Task Repeating_a_term_within_one_submission_counts_every_mention_when_repeats_are_allowed()
     {
-        var (_, poll) = await LivePollAsync(WordCloudPoll());
+        var (_, poll) = await LivePollAsync(WordCloudPoll("""{"allowDuplicatesFromSameUser":true}"""));
 
         var response = await PostAsync(Anonymous, $"/api/polls/{poll.Id}/wordcloud/submit",
             new WordCloudSubmitRequest(0, ["Docker", "docker", "  DOCKER  "], "Ada"));
@@ -151,7 +151,7 @@ public class ConcurrencyTests(SqlServerFixture sql) : ApiTestBase(sql)
         Assert.Equal(PollStatus.Ended, stored.Status);
     }
 
-    private static CreatePollRequest WordCloudPoll() => new(
+    private static CreatePollRequest WordCloudPoll(string? config = null) => new(
         "Which tools do you use?",
         PollType.WordCloud,
         [
@@ -166,7 +166,7 @@ public class ConcurrencyTests(SqlServerFixture sql) : ApiTestBase(sql)
                 CorrectAnswer: null,
                 Points: 10,
                 MaxWords: 5,
-                WordCloudConfig: null,
+                WordCloudConfig: config,
                 Options: []),
         ]);
 

@@ -20,6 +20,6 @@ public class WordCloudController : ControllerBase
 
     [EnableRateLimiting(RateLimitPolicies.Participation)]
     [HttpGet("{questionIndex:int}")]
-    public async Task<ActionResult<WordCloudResponse>> Get(Guid pollId, int questionIndex, [FromQuery] int topN = 50, CancellationToken ct = default)
+    public async Task<ActionResult<WordCloudResponse>> Get(Guid pollId, int questionIndex, [FromQuery] int? topN = null, CancellationToken ct = default)
         => Ok(await _service.GetAsync(pollId, questionIndex, topN, ct));
 }

@@ -1,4 +1,6 @@
+using System.Text.Json;
 using FluentValidation;
+using OpenQuiz.Application.WordCloud;
 using OpenQuiz.Domain.Enums;
 
 namespace OpenQuiz.Application.Polls;
@@ -40,8 +42,31 @@ public class QuestionInputValidator : AbstractValidator<QuestionInput>
         When(x => x.QuestionType == QuestionType.WordCloud, () =>
         {
             RuleFor(x => x.MaxWords).InclusiveBetween(1, 20).When(x => x.MaxWords.HasValue);
+
+            // The service falls back to the defaults on a config it cannot read,
+            // so catching it here is the only chance the author has to hear that
+            // the moderation they set up will not run.
+            RuleFor(x => x.WordCloudConfig)
+                .MaximumLength(16_000)
+                .Must(BeReadableSettings).WithMessage("Word cloud settings are not valid JSON.")
+                .When(x => !string.IsNullOrWhiteSpace(x.WordCloudConfig));
         });
     }
+
+    private static bool BeReadableSettings(string? json)
+    {
+        try
+        {
+            JsonSerializer.Deserialize<WordCloudSettings>(json!, Web);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 }
 
 public class JoinPollValidator : AbstractValidator<JoinPollRequest>
