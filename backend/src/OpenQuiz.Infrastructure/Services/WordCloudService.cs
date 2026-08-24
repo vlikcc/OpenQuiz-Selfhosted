@@ -44,10 +44,6 @@ public partial class WordCloudService : IWordCloudService
             throw Errors.Validation("No valid terms after normalization.");
 
         var now = DateTime.UtcNow;
-        var termsList = normalizedTerms.Select(t => t.Normalized).Distinct().ToList();
-        var existingAggs = await _db.WordCloudAggregates
-            .Where(a => a.QuestionId == question.Id && termsList.Contains(a.Term))
-            .ToListAsync(ct);
 
         foreach (var (original, term) in normalizedTerms)
         {
@@ -60,20 +56,14 @@ public partial class WordCloudService : IWordCloudService
                 OriginalTerm = original,
                 CreatedAt = now
             });
-
-            var agg = existingAggs.FirstOrDefault(a => a.Term == term);
-            if (agg is null)
-            {
-                agg = new WordCloudAggregate { QuestionId = question.Id, Term = term, Count = 1 };
-                _db.WordCloudAggregates.Add(agg);
-                existingAggs.Add(agg);
-            }
-            else
-            {
-                agg.Count++;
-            }
         }
         await _db.SaveChangesAsync(ct);
+
+        // Tallies are kept separately from the raw submissions because a whole
+        // room tends to send the same handful of words at once, and an
+        // in-memory read-modify-write would drop most of those hits.
+        foreach (var group in normalizedTerms.GroupBy(t => t.Normalized))
+            await IncrementTermAsync(question.Id, group.Key, group.Count(), ct);
 
         var response = await GetAsync(pollId, req.QuestionIndex, 50, ct);
         await _realtime.WordCloudUpdatedAsync(pollId, response);
@@ -100,6 +90,23 @@ public partial class WordCloudService : IWordCloudService
 
         return new WordCloudResponse(questionIndex, terms);
     }
+
+    private Task IncrementTermAsync(Guid questionId, string term, int by, CancellationToken ct) =>
+        ConcurrentCounters.IncrementOrCreateAsync(
+            token => _db.WordCloudAggregates
+                .Where(a => a.QuestionId == questionId && a.Term == term)
+                .ExecuteUpdateAsync(set => set.SetProperty(a => a.Count, a => a.Count + by), token),
+            async token =>
+            {
+                _db.WordCloudAggregates.Add(new WordCloudAggregate
+                {
+                    QuestionId = questionId,
+                    Term = term,
+                    Count = by
+                });
+                await _db.SaveChangesAsync(token);
+            },
+            ct);
 
     private static string Normalize(string raw)
     {

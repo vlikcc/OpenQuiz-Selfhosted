@@ -141,24 +141,46 @@ public class PollService : IPollService
     {
         await _joinValidator.ValidateAndThrowAsync(req, ct);
 
-        var poll = await _db.Polls.FirstOrDefaultAsync(p => p.Id == id, ct)
-                   ?? throw Errors.NotFound("Poll");
+        // A room fills up in bursts, so the tally is incremented in the UPDATE
+        // rather than read into memory and written back.
+        var joined = await _db.Polls
+            .Where(p => p.Id == id)
+            .ExecuteUpdateAsync(set => set.SetProperty(p => p.ParticipantCount, p => p.ParticipantCount + 1), ct);
 
-        poll.ParticipantCount++;
-        await _db.SaveChangesAsync(ct);
+        if (joined == 0) throw Errors.NotFound("Poll");
+
         return await PublishAsync(id, ct);
     }
 
+    /// <summary>
+    /// Poll carries a row version, so a second writer that changed the poll
+    /// between our read and write makes EF throw rather than overwrite. A
+    /// double-clicked control is still the operator's intent, so the mutation is
+    /// reapplied to the state the winner left behind. Sustained contention gives
+    /// up with a conflict the caller can retry, never a 500.
+    /// </summary>
     private async Task<PollDto> TransitionAsync(Guid id, Action<Poll> mutate, CancellationToken ct)
     {
-        var poll = await _db.Polls.Include(p => p.Questions)
-                                  .FirstOrDefaultAsync(p => p.Id == id, ct)
-                   ?? throw Errors.NotFound("Poll");
-        EnsureOwner(poll);
-        mutate(poll);
-        poll.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
-        return await PublishAsync(id, ct);
+        try
+        {
+            return await ConcurrentCounters.RetryOnConcurrencyAsync(async token =>
+            {
+                _db.ChangeTracker.Clear();
+
+                var poll = await _db.Polls.Include(p => p.Questions)
+                                          .FirstOrDefaultAsync(p => p.Id == id, token)
+                           ?? throw Errors.NotFound("Poll");
+                EnsureOwner(poll);
+                mutate(poll);
+                poll.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync(token);
+                return await PublishAsync(id, token);
+            }, maxAttempts: 3, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw Errors.Conflict("Someone else is controlling this poll right now. Try again.");
+        }
     }
 
     /// <summary>
