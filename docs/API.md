@@ -146,3 +146,4 @@ Server → client events:
 | `WordCloudUpdated` | `{ questionIndex, terms: [{ term, count }] }` (throttled 250 ms) |
 | `OpenAnswerSubmitted` | `{ questionIndex, userName }` |
 | `ReactionBurst` | `{ emoji, sender, at }` |
+| `LeaderboardUpdated` | `{ entries: [{ userName, points, totalTimeMs }] }` — top 10, after any answer or grade that moves points (throttled 250 ms) |

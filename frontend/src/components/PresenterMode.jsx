@@ -1,19 +1,24 @@
 import { Suspense, lazy, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { BarChart, Bar, XAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts';
-import { Home, QrCode, Users, Loader2, ChevronRight, ChevronLeft, BarChart3, MessageSquare, Play, Square } from 'lucide-react';
+import { Home, QrCode, Users, Loader2, ChevronRight, ChevronLeft, BarChart3, MessageSquare, Play, Square, Trophy } from 'lucide-react';
 import { COLORS, CONTENT_TYPES, POLL_TYPE_KEY, POLL_STATUS_KEY, QUESTION_TYPE_KEY } from '../config/constants';
 import { pollService } from '../services/pollService';
 import { voteService } from '../services/voteService';
 import { wordcloudService } from '../services/wordcloudService';
+import { scoreService } from '../services/scoreService';
 import { realtimeService } from '../services/realtimeService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import KatexText from './KatexText';
 import OpenAnswerList from './OpenAnswerList';
+import Leaderboard from './Leaderboard';
 import { mergeAnswerKey } from '../utils/pollAnswers';
 
 // d3's layout solver is only needed by word cloud questions.
 const WordCloudCanvas = lazy(() => import('./wordcloud/WordCloudCanvas'));
+
+// What the wall has room for, and what the hub sends after a scored answer.
+const LEADERBOARD_SIZE = 10;
 
 export default function PresenterMode({ pollId, onExit, showToast }) {
   const { t } = useTranslation();
@@ -21,8 +26,11 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
   const [aggregates, setAggregates] = useState([]);
   const [openAnswers, setOpenAnswers] = useState([]);
   const [wordCloud, setWordCloud] = useState({ questionIndex: 0, terms: [] });
+  const [scores, setScores] = useState([]);
   const [showQr, setShowQr] = useState(false);
-  const [activeTab, setActiveTab] = useState('chart');
+  // A tab the presenter picked, remembered only for as long as the session is
+  // in the same state — so ending a contest brings up the standings on its own.
+  const [tabChoice, setTabChoice] = useState(null);
   const [floatingReactions, setFloatingReactions] = useState([]);
   const reactionIdRef = useRef(0);
 
@@ -57,6 +65,7 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
       },
       onWordCloudUpdated: (payload) => { if (active) setWordCloud(payload); },
       onOpenAnswerSubmitted: () => { if (active) scheduleOpenAnswerReload(); },
+      onLeaderboardUpdated: (payload) => { if (active) setScores(payload.entries || []); },
       onReaction: (r) => {
         if (!active) return;
         const id = ++reactionIdRef.current;
@@ -72,6 +81,19 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
       if (openAnswerReloadRef.current) clearTimeout(openAnswerReloadRef.current);
     };
   }, [pollId, scheduleOpenAnswerReload]);
+
+  // Only contests, quizzes and exams keep points, so only they have standings.
+  const statusKey = poll ? (POLL_STATUS_KEY[poll.status] || 'waiting') : 'waiting';
+  const typeKey = poll ? (POLL_TYPE_KEY[poll.type] || 'contest') : 'contest';
+  const typeCfg = CONTENT_TYPES[typeKey] || CONTENT_TYPES.contest;
+  const hasScores = typeCfg.hasCorrectAnswer;
+
+  // The hub pushes the standings after every scored answer; this is the first
+  // draw, and the redraw for a presenter who opens a session already in play.
+  useEffect(() => {
+    if (!pollId || !hasScores) return;
+    scoreService.leaderboard(pollId, LEADERBOARD_SIZE).then(setScores).catch(() => {});
+  }, [pollId, hasScores, statusKey]);
 
   // Refresh aggregates / open answers / wordcloud when question changes
   useEffect(() => {
@@ -102,12 +124,14 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
 
   if (!poll) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
 
-  const statusKey = POLL_STATUS_KEY[poll.status] || 'waiting';
-  const typeKey = POLL_TYPE_KEY[poll.type] || 'contest';
-  const typeCfg = CONTENT_TYPES[typeKey] || CONTENT_TYPES.contest;
   const qTypeKey = currentQ ? (QUESTION_TYPE_KEY[currentQ.questionType] || 'multiple') : 'multiple';
   const isWordCloud = qTypeKey === 'wordcloud';
   const isOpen = qTypeKey === 'open';
+
+  const activeTab = tabChoice?.status === statusKey
+    ? tabChoice.tab
+    : (statusKey === 'ended' && hasScores ? 'leaderboard' : 'chart');
+  const chooseTab = (tab) => setTabChoice({ status: statusKey, tab });
 
   const handleScoreAnswer = async (answer, score) => {
     try {
@@ -164,12 +188,15 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
             </div>
 
             <div className="flex gap-2 mb-4">
-              <button onClick={() => setActiveTab('chart')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'chart' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><BarChart3 size={16} className="inline mr-1" /> {t('presenter.results')}</button>
-              {isOpen && <button onClick={() => setActiveTab('open')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'open' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><MessageSquare size={16} className="inline mr-1" /> {t('presenter.answers', { n: openAnswers.length })}</button>}
+              <button onClick={() => chooseTab('chart')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'chart' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><BarChart3 size={16} className="inline mr-1" /> {t('presenter.results')}</button>
+              {isOpen && <button onClick={() => chooseTab('open')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'open' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><MessageSquare size={16} className="inline mr-1" /> {t('presenter.answers', { n: openAnswers.length })}</button>}
+              {hasScores && <button onClick={() => chooseTab('leaderboard')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'leaderboard' ? 'bg-white/20' : 'bg-white/5 hover:bg-white/10'}`}><Trophy size={16} className="inline mr-1" /> {t('presenter.leaderboard')}</button>}
             </div>
 
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 min-h-[400px]">
-              {isWordCloud ? (
+              {activeTab === 'leaderboard' ? (
+                <Leaderboard entries={scores} />
+              ) : isWordCloud ? (
                 <div className="h-[400px]">
                   <Suspense fallback={null}>
                     <WordCloudCanvas terms={wordCloud.terms} width={1000} height={400} />

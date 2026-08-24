@@ -4,6 +4,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Application.Common;
+using OpenQuiz.Application.Realtime;
 using OpenQuiz.Application.Votes;
 using OpenQuiz.Domain.Entities;
 using OpenQuiz.Domain.Enums;
@@ -16,6 +17,7 @@ public class VoteService : IVoteService
     private readonly OpenQuizDbContext _db;
     private readonly ICurrentUser _user;
     private readonly IRealtimeNotifier _realtime;
+    private readonly IScoreService _scores;
     private readonly IValidator<SubmitVoteRequest> _vv;
     private readonly IValidator<SubmitOpenAnswerRequest> _ov;
 
@@ -23,10 +25,11 @@ public class VoteService : IVoteService
         OpenQuizDbContext db,
         ICurrentUser user,
         IRealtimeNotifier realtime,
+        IScoreService scores,
         IValidator<SubmitVoteRequest> vv,
         IValidator<SubmitOpenAnswerRequest> ov)
     {
-        _db = db; _user = user; _realtime = realtime; _vv = vv; _ov = ov;
+        _db = db; _user = user; _realtime = realtime; _scores = scores; _vv = vv; _ov = ov;
     }
 
     public async Task<VoteDto> SubmitAsync(Guid pollId, SubmitVoteRequest req, CancellationToken ct)
@@ -222,9 +225,20 @@ public class VoteService : IVoteService
 
     /// <summary>
     /// Adds to a running total, so two answers scored at the same moment do not
-    /// overwrite each other.
+    /// overwrite each other, and tells the room where it now stands.
     /// </summary>
-    private Task AwardPointsAsync(Guid pollId, string userName, int points, int elapsedMs, CancellationToken ct)
+    private async Task AwardPointsAsync(Guid pollId, string userName, int points, int elapsedMs, CancellationToken ct)
+    {
+        await AccumulateAsync(pollId, userName, points, elapsedMs, ct);
+
+        var standings = await _scores.LeaderboardAsync(pollId, LeaderboardSize, ct);
+        await _realtime.LeaderboardUpdatedAsync(pollId, new LeaderboardUpdate(standings));
+    }
+
+    /// <summary>How much of the table a live screen shows.</summary>
+    private const int LeaderboardSize = 10;
+
+    private Task AccumulateAsync(Guid pollId, string userName, int points, int elapsedMs, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
 

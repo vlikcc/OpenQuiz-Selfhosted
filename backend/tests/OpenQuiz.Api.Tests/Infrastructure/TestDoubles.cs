@@ -33,8 +33,11 @@ public sealed class CapturingEmailSender : IEmailSender
 public sealed class RecordingRealtimeNotifier : IRealtimeNotifier
 {
     private readonly ConcurrentQueue<PollDto> _pollUpdates = new();
+    private readonly ConcurrentQueue<LeaderboardUpdate> _leaderboards = new();
 
     public IReadOnlyCollection<PollDto> PollUpdates => _pollUpdates;
+
+    public IReadOnlyCollection<LeaderboardUpdate> Leaderboards => _leaderboards;
 
     public Task PollUpdatedAsync(Guid pollId, PollDto poll)
     {
@@ -49,4 +52,10 @@ public sealed class RecordingRealtimeNotifier : IRealtimeNotifier
     public Task ReactionAsync(Guid pollId, ReactionEvent reaction) => Task.CompletedTask;
 
     public Task OpenAnswerSubmittedAsync(Guid pollId, int questionIndex, string userName) => Task.CompletedTask;
+
+    public Task LeaderboardUpdatedAsync(Guid pollId, LeaderboardUpdate payload)
+    {
+        _leaderboards.Enqueue(payload);
+        return Task.CompletedTask;
+    }
 }

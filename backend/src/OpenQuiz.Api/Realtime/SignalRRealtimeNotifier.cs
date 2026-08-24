@@ -37,4 +37,11 @@ public class SignalRRealtimeNotifier : IRealtimeNotifier
     public Task OpenAnswerSubmittedAsync(Guid pollId, int questionIndex, string userName) =>
         _hub.Clients.Group(PollHub.GroupName(pollId))
             .SendAsync("OpenAnswerSubmitted", new { questionIndex, userName });
+
+    // A room answering together moves the standings once per answer, and only
+    // the last of those is worth drawing.
+    public Task LeaderboardUpdatedAsync(Guid pollId, LeaderboardUpdate payload) =>
+        _throttle.Coalesce($"lb:{pollId}", payload,
+            p => _hub.Clients.Group(PollHub.GroupName(pollId))
+                .SendAsync("LeaderboardUpdated", p));
 }
