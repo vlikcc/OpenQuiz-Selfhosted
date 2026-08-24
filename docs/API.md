@@ -58,6 +58,7 @@ returns 200 rows and `page=0` returns the first page.
 | GET | `/api/polls/{id}` | — |
 | POST | `/api/polls` | bearer + `canCreate` |
 | PUT | `/api/polls/{id}` | bearer (owner/admin) |
+| POST | `/api/polls/{id}/duplicate` | bearer (owner/admin) + `canCreate` — `{ title? }` |
 | DELETE | `/api/polls/{id}` | bearer (owner/admin) |
 | POST | `/api/polls/{id}/activate` | bearer (owner/admin) |
 | POST | `/api/polls/{id}/next-question` | bearer (owner/admin) |
@@ -68,6 +69,12 @@ returns 200 rows and `page=0` returns the first page.
 The list returns summaries (`PollSummaryDto`: the poll's own fields plus
 `questionCount`) rather than the full `PollDto`. Fetch `/api/polls/{id}` for the
 questions and options.
+
+`duplicate` returns a new poll that owns copies of every question and option,
+belongs to the caller, and is back in `Waiting` with no participants or answers —
+a poll holds one session's worth of answers, so running the same material again
+needs a fresh one. `title` is optional; the server appends a suffix when it is
+omitted.
 
 `PollType` enum: `1=Contest 2=Survey 3=Quiz 4=Exam 5=WordCloud`.
 `PollStatus`: `1=Waiting 2=Live 3=Ended`. `QuestionType`: `1=MultipleChoice 2=Open 3=WordCloud`.

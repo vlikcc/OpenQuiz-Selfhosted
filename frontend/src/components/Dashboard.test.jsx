@@ -6,7 +6,7 @@ import { pollService } from '../services/pollService';
 import { POLL_TYPE_VALUE } from '../config/constants';
 
 vi.mock('../services/pollService', () => ({
-  pollService: { list: vi.fn(), get: vi.fn(), remove: vi.fn() },
+  pollService: { list: vi.fn(), get: vi.fn(), remove: vi.fn(), duplicate: vi.fn() },
 }));
 
 const summary = (n) => ({
@@ -19,7 +19,7 @@ const summary = (n) => ({
 
 const page = (items, hasMore) => ({ items, page: 1, pageSize: 24, totalCount: 30, hasMore });
 
-function renderDashboard() {
+function renderDashboard(props = {}) {
   return render(
     <Dashboard
       onNavigate={vi.fn()}
@@ -29,6 +29,7 @@ function renderDashboard() {
       isAuthorized
       composer={null}
       setComposer={vi.fn()}
+      {...props}
     />,
   );
 }
@@ -72,5 +73,50 @@ describe('poll list paging', () => {
     renderDashboard();
 
     expect(await screen.findByText('3 Soru')).toBeInTheDocument();
+  });
+});
+
+describe('copying a poll', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('names the copy, reports it and reloads the first page', async () => {
+    const user = userEvent.setup();
+    const showToast = vi.fn();
+    pollService.list.mockResolvedValue(page([summary(1)], false));
+    pollService.duplicate.mockResolvedValue({ id: 'poll-copy', title: 'Yarışma 1 (kopya)' });
+
+    renderDashboard({ showToast });
+    await screen.findByText('Yarışma 1');
+
+    await user.click(screen.getByRole('button', { name: 'Kopyasını oluştur' }));
+
+    expect(pollService.duplicate).toHaveBeenCalledWith('poll-1', 'Yarışma 1 (kopya)');
+    expect(showToast).toHaveBeenCalledWith('"Yarışma 1 (kopya)" oluşturuldu');
+    // Once on mount and once after the copy: the new poll has to show up.
+    expect(pollService.list).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the list intact and says so when the copy fails', async () => {
+    const user = userEvent.setup();
+    const showToast = vi.fn();
+    pollService.list.mockResolvedValue(page([summary(1)], false));
+    pollService.duplicate.mockRejectedValue(new Error('Not the owner of this poll.'));
+
+    renderDashboard({ showToast });
+    await screen.findByText('Yarışma 1');
+
+    await user.click(screen.getByRole('button', { name: 'Kopyasını oluştur' }));
+
+    expect(showToast).toHaveBeenCalledWith('Not the owner of this poll.', 'error');
+    expect(screen.getByText('Yarışma 1')).toBeInTheDocument();
+  });
+
+  it('does not offer the copy button to accounts that cannot author', async () => {
+    pollService.list.mockResolvedValue(page([summary(1)], false));
+
+    renderDashboard({ isAuthorized: false });
+    await screen.findByText('Yarışma 1');
+
+    expect(screen.queryByRole('button', { name: 'Kopyasını oluştur' })).not.toBeInTheDocument();
   });
 });

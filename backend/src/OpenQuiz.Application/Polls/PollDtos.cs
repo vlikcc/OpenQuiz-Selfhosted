@@ -12,6 +12,12 @@ public record UpdatePollRequest(
     PollType Type,
     List<QuestionInput> Questions);
 
+/// <summary>
+/// Copies a poll's questions into a fresh, unstarted one. The title is optional
+/// so a client can localise it; the server names the copy when it is omitted.
+/// </summary>
+public record DuplicatePollRequest(string? Title = null);
+
 public record QuestionInput(
     int OrderIndex,
     string Text,

@@ -9,6 +9,7 @@ public interface IPollService
     Task<PollDto?> GetAsync(Guid id, CancellationToken ct);
     Task<PollDto> CreateAsync(CreatePollRequest req, CancellationToken ct);
     Task<PollDto> UpdateAsync(Guid id, UpdatePollRequest req, CancellationToken ct);
+    Task<PollDto> DuplicateAsync(Guid id, DuplicatePollRequest req, CancellationToken ct);
     Task DeleteAsync(Guid id, CancellationToken ct);
     Task<PollDto> ActivateAsync(Guid id, CancellationToken ct);
     Task<PollDto> NextQuestionAsync(Guid id, CancellationToken ct);

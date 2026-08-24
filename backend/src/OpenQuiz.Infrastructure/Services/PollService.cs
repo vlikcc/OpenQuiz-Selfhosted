@@ -88,6 +88,69 @@ public class PollService : IPollService
         return (await GetAsync(poll.Id, ct))!;
     }
 
+    /// <summary>
+    /// A fresh, unstarted copy of a poll under the caller's name. Running the
+    /// same quiz with a second group meant retyping every question, because a
+    /// poll carries one session's worth of answers and cannot be replayed.
+    /// </summary>
+    public async Task<PollDto> DuplicateAsync(Guid id, DuplicatePollRequest req, CancellationToken ct)
+    {
+        if (!_user.IsAuthenticated || _user.UserId is not Guid uid) throw Errors.Unauthorized();
+        if (!_user.IsAdmin && !_user.CanCreate) throw Errors.Forbidden("You are not authorized to create polls.");
+
+        var source = await _db.Polls
+            .Include(p => p.Questions).ThenInclude(q => q.Options)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == id, ct)
+            ?? throw Errors.NotFound("Poll");
+
+        EnsureOwner(source);
+
+        var title = string.IsNullOrWhiteSpace(req.Title) ? DefaultCopyTitle(source.Title) : req.Title.Trim();
+        if (title.Length > 256) title = title[..256];
+
+        var copy = new Poll
+        {
+            Title = title,
+            Type = source.Type,
+            Status = PollStatus.Waiting,
+            CurrentQuestionIndex = 0,
+            CreatorId = uid,
+            CreatedAt = DateTime.UtcNow,
+            Questions = [.. source.Questions
+                .OrderBy(q => q.OrderIndex)
+                .Select((q, idx) => new Question
+                {
+                    OrderIndex = idx,
+                    Text = q.Text,
+                    ImageUrl = q.ImageUrl,
+                    TimeLimit = q.TimeLimit,
+                    QuestionType = q.QuestionType,
+                    AllowMultiple = q.AllowMultiple,
+                    CorrectOptionIndex = q.CorrectOptionIndex,
+                    CorrectAnswer = q.CorrectAnswer,
+                    Points = q.Points,
+                    MaxWords = q.MaxWords,
+                    WordCloudConfig = q.WordCloudConfig,
+                    Options = [.. q.Options
+                        .OrderBy(o => o.OrderIndex)
+                        .Select((o, oIdx) => new Option { OrderIndex = oIdx, Text = o.Text })]
+                })]
+        };
+
+        _db.Polls.Add(copy);
+        await _db.SaveChangesAsync(ct);
+        return (await GetAsync(copy.Id, ct))!;
+    }
+
+    private static string DefaultCopyTitle(string title)
+    {
+        const string suffix = " (kopya)";
+        return title.Length + suffix.Length > 256
+            ? title[..(256 - suffix.Length)] + suffix
+            : title + suffix;
+    }
+
     public async Task<PollDto> UpdateAsync(Guid id, UpdatePollRequest req, CancellationToken ct)
     {
         await _updateValidator.ValidateAndThrowAsync(req, ct);
