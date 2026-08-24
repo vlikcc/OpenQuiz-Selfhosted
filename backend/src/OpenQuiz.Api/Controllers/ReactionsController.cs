@@ -17,4 +17,9 @@ public class ReactionsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ReactionEvent>> Send(Guid pollId, [FromBody] ReactionRequest req, CancellationToken ct)
         => Ok(await _service.BroadcastAsync(pollId, req, ct));
+
+    [EnableRateLimiting(RateLimitPolicies.Participation)]
+    [HttpGet]
+    public async Task<ActionResult<List<ReactionTally>>> Tally(Guid pollId, CancellationToken ct)
+        => Ok(await _service.TallyAsync(pollId, ct));
 }

@@ -6,6 +6,7 @@ import { pollService } from '../services/pollService';
 import { voteService } from '../services/voteService';
 import { wordcloudService } from '../services/wordcloudService';
 import { scoreService } from '../services/scoreService';
+import { reactionService } from '../services/reactionService';
 import { realtimeService } from '../services/realtimeService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
@@ -20,6 +21,16 @@ const WordCloudCanvas = lazy(() => import('./wordcloud/WordCloudCanvas'));
 // What the wall has room for, and what the hub sends after a scored answer.
 const LEADERBOARD_SIZE = 10;
 
+/** Keeps the running totals in step with the bursts arriving from the hub. */
+function bumpTally(tally, emoji) {
+  const index = tally.findIndex((t) => t.emoji === emoji);
+  if (index < 0) return [...tally, { emoji, count: 1 }];
+
+  const next = [...tally];
+  next[index] = { emoji, count: next[index].count + 1 };
+  return next;
+}
+
 export default function PresenterMode({ pollId, onExit, showToast }) {
   const { t } = useTranslation();
   const [poll, setPoll] = useState(null);
@@ -32,6 +43,7 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
   // in the same state — so ending a contest brings up the standings on its own.
   const [tabChoice, setTabChoice] = useState(null);
   const [floatingReactions, setFloatingReactions] = useState([]);
+  const [reactionTally, setReactionTally] = useState([]);
   const reactionIdRef = useRef(0);
 
   const ct = (key) => t(`contentTypes.${key}.label`);
@@ -51,6 +63,7 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
     if (!pollId) return;
     let active = true;
     pollService.get(pollId).then((p) => { if (active) setPoll(p); }).catch((e) => showToast(e.message, 'error'));
+    reactionService.tally(pollId).then((t) => { if (active) setReactionTally(t); }).catch(() => {});
 
     const unsubPromise = realtimeService.subscribe(pollId, {
       onPollUpdated: (p) => { if (active) setPoll((prev) => mergeAnswerKey(p, prev)); },
@@ -72,6 +85,7 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
         const x = Math.random() * 80 + 10;
         setFloatingReactions((prev) => [...prev, { id, emoji: r.emoji, x }]);
         setTimeout(() => setFloatingReactions((prev) => prev.filter((f) => f.id !== id)), 3000);
+        setReactionTally((prev) => bumpTally(prev, r.emoji));
       },
     });
 
@@ -162,6 +176,13 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {reactionTally.length > 0 && (
+            <span className="hidden sm:flex items-center gap-2 px-3 py-1 text-xs bg-white/10 rounded-full" title={t('presenter.reactions')}>
+              {reactionTally.slice(0, 4).map((r) => (
+                <span key={r.emoji}>{r.emoji} {r.count}</span>
+              ))}
+            </span>
+          )}
           <span className="px-3 py-1 text-xs bg-white/10 rounded-full">
             <Users size={14} className="inline -mt-0.5" /> {poll.participantCount}
           </span>
@@ -185,6 +206,14 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
               <h2 className="text-3xl font-bold">
                 {typeKey === 'exam' && currentQ.text.includes('$') ? <KatexText text={currentQ.text} /> : currentQ.text}
               </h2>
+              {/* A question whose picture only reached the phones was half a question. */}
+              {currentQ.imageUrl && (
+                <img
+                  src={currentQ.imageUrl}
+                  alt=""
+                  className="mt-4 max-h-64 rounded-xl shadow-lg object-contain bg-black/20"
+                />
+              )}
             </div>
 
             <div className="flex gap-2 mb-4">
