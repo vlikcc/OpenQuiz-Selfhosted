@@ -30,7 +30,8 @@ public partial class WordCloudService : IWordCloudService
         var poll = await _db.Polls.Include(p => p.Questions).FirstOrDefaultAsync(p => p.Id == pollId, ct)
                    ?? throw Errors.NotFound("Poll");
 
-        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex);
+        var now = DateTime.UtcNow;
+        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex, now);
 
         var maxWords = question.MaxWords ?? 5;
         var normalizedTerms = req.Terms
@@ -42,8 +43,6 @@ public partial class WordCloudService : IWordCloudService
 
         if (normalizedTerms.Count == 0)
             throw Errors.Validation("No valid terms after normalization.");
-
-        var now = DateTime.UtcNow;
 
         foreach (var (original, term) in normalizedTerms)
         {

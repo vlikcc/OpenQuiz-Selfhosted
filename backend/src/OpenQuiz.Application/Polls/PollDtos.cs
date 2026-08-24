@@ -40,6 +40,18 @@ public record PollDto(
     string CreatorEmail,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
+    /// <summary>
+    /// UTC instant the current question went on screen, or null when no question
+    /// is running. Clients count down from this rather than from their own load
+    /// time, so a late joiner sees the same remaining seconds as everyone else.
+    /// </summary>
+    DateTime? QuestionStartedAt,
+    /// <summary>
+    /// The server's clock at the moment this snapshot was produced. A client
+    /// subtracts it from its own to find its offset, which is what lets a late
+    /// joiner or a phone with a wrong clock draw the same countdown as the room.
+    /// </summary>
+    DateTime ServerTime,
     List<QuestionDto> Questions);
 
 /// <summary>

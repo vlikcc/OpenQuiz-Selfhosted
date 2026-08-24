@@ -129,7 +129,9 @@
     "yourName": "Adınız",
     "voteFailed": "Oy gönderilemedi",
     "answerFailed": "Cevap gönderilemedi",
-    "submitFailed": "Gönderilemedi"
+    "submitFailed": "Gönderilemedi",
+    "timeUp": "SÜRE DOLDU",
+    "secondsLeft": "{{n}} sn"
   },
   "presenter": {
     "waitingRoomTitle": "Bekleme Odası",

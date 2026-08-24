@@ -129,7 +129,9 @@
     "yourName": "Your name",
     "voteFailed": "Vote failed",
     "answerFailed": "Answer failed",
-    "submitFailed": "Submit failed"
+    "submitFailed": "Submit failed",
+    "timeUp": "TIME IS UP",
+    "secondsLeft": "{{n}}s"
   },
   "presenter": {
     "waitingRoomTitle": "Waiting room",

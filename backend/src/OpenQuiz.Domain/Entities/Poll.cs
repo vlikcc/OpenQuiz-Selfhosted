@@ -12,6 +12,13 @@ public class Poll
     public int ParticipantCount { get; set; }
     public bool IsActive { get; set; }
 
+    /// <summary>
+    /// When the presenter put the current question on screen. The countdown every
+    /// participant sees is derived from this, so a client that pauses its own
+    /// timer cannot buy itself extra seconds.
+    /// </summary>
+    public DateTime? QuestionStartedAt { get; set; }
+
     public Guid CreatorId { get; set; }
     public User Creator { get; set; } = null!;
 

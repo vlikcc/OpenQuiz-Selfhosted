@@ -33,11 +33,14 @@ public class VoteService : IVoteService
     {
         await _vv.ValidateAndThrowAsync(req, ct);
 
+        var now = DateTime.UtcNow;
+
         var poll = await _db.Polls.Include(p => p.Questions)
             .FirstOrDefaultAsync(p => p.Id == pollId, ct)
             ?? throw Errors.NotFound("Poll");
 
-        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex);
+        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex, now);
+        var elapsedMs = PollParticipation.ElapsedMs(poll, now, req.ResponseTimeMs);
 
         var voterKey = VoterKeyFor(req.UserName);
         var alreadyVoted = await _db.Votes
@@ -59,8 +62,8 @@ public class VoteService : IVoteService
             VoterKey = voterKey,
             SelectedOptionIndices = JsonSerializer.Serialize(req.SelectedIndices),
             IsCorrect = isCorrect,
-            ResponseTimeMs = req.ResponseTimeMs,
-            CreatedAt = DateTime.UtcNow
+            ResponseTimeMs = elapsedMs,
+            CreatedAt = now
         };
         _db.Votes.Add(vote);
 
@@ -77,7 +80,7 @@ public class VoteService : IVoteService
         }
 
         if (isCorrect == true)
-            await AwardPointsAsync(poll.Id, vote.UserName, question.Points, req.ResponseTimeMs ?? 0, ct);
+            await AwardPointsAsync(poll.Id, vote.UserName, question.Points, elapsedMs, ct);
 
         // Recompute aggregate for this question and notify.
         var thisQ = await SingleQuestionAggregateAsync(poll.Id, question.Id, req.QuestionIndex, ct);
@@ -91,11 +94,13 @@ public class VoteService : IVoteService
     {
         await _ov.ValidateAndThrowAsync(req, ct);
 
+        var now = DateTime.UtcNow;
+
         var poll = await _db.Polls.Include(p => p.Questions)
             .FirstOrDefaultAsync(p => p.Id == pollId, ct)
             ?? throw Errors.NotFound("Poll");
 
-        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex);
+        var question = PollParticipation.EnsureVotable(poll, req.QuestionIndex, now);
 
         var entity = new OpenAnswer
         {
@@ -104,7 +109,7 @@ public class VoteService : IVoteService
             UserId = _user.UserId,
             UserName = req.UserName.Trim(),
             AnswerText = req.AnswerText,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now
         };
         _db.OpenAnswers.Add(entity);
         await _db.SaveChangesAsync(ct);
