@@ -17,7 +17,7 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -139,6 +139,9 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("ParticipantCount")
                         .HasColumnType("int");
+
+                    b.Property<DateTime?>("QuestionStartedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -397,15 +400,19 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<string>("VoterKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PollId");
 
-                    b.HasIndex("QuestionId", "UserId")
-                        .IsUnique()
-                        .HasFilter("[UserId] IS NOT NULL");
-
                     b.HasIndex("QuestionId", "UserName");
+
+                    b.HasIndex("QuestionId", "VoterKey")
+                        .IsUnique();
 
                     b.ToTable("Votes", (string)null);
                 });

@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Send, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-export default function WordCloudVoter({ maxWords = 3, isSubmitting, onSubmit }) {
+export default function WordCloudVoter({ maxWords = 3, isSubmitting, onSubmit, onDraftChange }) {
   const { t } = useTranslation();
   const [terms, setTerms] = useState(['']);
+
+  // The parent sends whatever has been typed when the question's timer runs
+  // out, so it has to be able to see the draft.
+  useEffect(() => { onDraftChange?.(terms.map((term) => term.trim()).filter(Boolean)); }, [terms, onDraftChange]);
 
   const updateAt = (i, val) => setTerms((t) => t.map((v, j) => (j === i ? val : v)));
   const addTerm = () => { if (terms.length < maxWords) setTerms((t) => [...t, '']); };

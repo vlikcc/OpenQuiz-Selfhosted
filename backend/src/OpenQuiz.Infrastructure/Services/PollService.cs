@@ -30,28 +30,36 @@ public class PollService : IPollService
         _createValidator = cv; _updateValidator = uv; _joinValidator = jv;
     }
 
-    public async Task<List<PollDto>> ListAsync(CancellationToken ct)
+    public async Task<PagedResult<PollSummaryDto>> ListAsync(PageRequest page, CancellationToken ct)
     {
         if (!_user.IsAuthenticated) throw Errors.Unauthorized();
 
-        var q = _db.Polls.Include(p => p.Creator)
-                         .Include(p => p.Questions).ThenInclude(q => q.Options)
-                         .AsNoTracking();
+        var q = _db.Polls.AsNoTracking();
 
         if (!_user.IsAdmin && _user.UserId is Guid uid)
             q = q.Where(p => p.CreatorId == uid);
 
-        var polls = await q.OrderByDescending(p => p.CreatedAt).ToListAsync(ct);
-        return polls.Select(Map).ToList();
+        var total = await q.CountAsync(ct);
+
+        // Projected in SQL: the list never needs the questions themselves, and
+        // loading them turned one screen into thousands of rows.
+        var items = await q
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip(page.Skip)
+            .Take(page.PageSize)
+            .Select(p => new PollSummaryDto(
+                p.Id, p.Title, p.Type, p.Status, p.CurrentQuestionIndex, p.ParticipantCount,
+                p.IsActive, p.CreatorId, p.Creator!.Email, p.CreatedAt, p.UpdatedAt,
+                p.Questions.Count))
+            .ToListAsync(ct);
+
+        return new PagedResult<PollSummaryDto>(items, page.Page, page.PageSize, total);
     }
 
     public async Task<PollDto?> GetAsync(Guid id, CancellationToken ct)
     {
-        var poll = await _db.Polls.Include(p => p.Creator)
-                                  .Include(p => p.Questions).ThenInclude(q => q.Options)
-                                  .AsNoTracking()
-                                  .FirstOrDefaultAsync(p => p.Id == id, ct);
-        return poll is null ? null : Map(poll);
+        var poll = await LoadAsync(id, ct);
+        return poll is null ? null : MapForViewer(poll);
     }
 
     public async Task<PollDto> CreateAsync(CreatePollRequest req, CancellationToken ct)
@@ -78,6 +86,69 @@ public class PollService : IPollService
         _db.Polls.Add(poll);
         await _db.SaveChangesAsync(ct);
         return (await GetAsync(poll.Id, ct))!;
+    }
+
+    /// <summary>
+    /// A fresh, unstarted copy of a poll under the caller's name. Running the
+    /// same quiz with a second group meant retyping every question, because a
+    /// poll carries one session's worth of answers and cannot be replayed.
+    /// </summary>
+    public async Task<PollDto> DuplicateAsync(Guid id, DuplicatePollRequest req, CancellationToken ct)
+    {
+        if (!_user.IsAuthenticated || _user.UserId is not Guid uid) throw Errors.Unauthorized();
+        if (!_user.IsAdmin && !_user.CanCreate) throw Errors.Forbidden("You are not authorized to create polls.");
+
+        var source = await _db.Polls
+            .Include(p => p.Questions).ThenInclude(q => q.Options)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == id, ct)
+            ?? throw Errors.NotFound("Poll");
+
+        EnsureOwner(source);
+
+        var title = string.IsNullOrWhiteSpace(req.Title) ? DefaultCopyTitle(source.Title) : req.Title.Trim();
+        if (title.Length > 256) title = title[..256];
+
+        var copy = new Poll
+        {
+            Title = title,
+            Type = source.Type,
+            Status = PollStatus.Waiting,
+            CurrentQuestionIndex = 0,
+            CreatorId = uid,
+            CreatedAt = DateTime.UtcNow,
+            Questions = [.. source.Questions
+                .OrderBy(q => q.OrderIndex)
+                .Select((q, idx) => new Question
+                {
+                    OrderIndex = idx,
+                    Text = q.Text,
+                    ImageUrl = q.ImageUrl,
+                    TimeLimit = q.TimeLimit,
+                    QuestionType = q.QuestionType,
+                    AllowMultiple = q.AllowMultiple,
+                    CorrectOptionIndex = q.CorrectOptionIndex,
+                    CorrectAnswer = q.CorrectAnswer,
+                    Points = q.Points,
+                    MaxWords = q.MaxWords,
+                    WordCloudConfig = q.WordCloudConfig,
+                    Options = [.. q.Options
+                        .OrderBy(o => o.OrderIndex)
+                        .Select((o, oIdx) => new Option { OrderIndex = oIdx, Text = o.Text })]
+                })]
+        };
+
+        _db.Polls.Add(copy);
+        await _db.SaveChangesAsync(ct);
+        return (await GetAsync(copy.Id, ct))!;
+    }
+
+    private static string DefaultCopyTitle(string title)
+    {
+        const string suffix = " (kopya)";
+        return title.Length + suffix.Length > 256
+            ? title[..(256 - suffix.Length)] + suffix
+            : title + suffix;
     }
 
     public async Task<PollDto> UpdateAsync(Guid id, UpdatePollRequest req, CancellationToken ct)
@@ -121,52 +192,115 @@ public class PollService : IPollService
             p.IsActive = true;
             p.CurrentQuestionIndex = 0;
             p.ParticipantCount = 0;
+            p.QuestionStartedAt = DateTime.UtcNow;
         }, ct);
 
     public async Task<PollDto> NextQuestionAsync(Guid id, CancellationToken ct) =>
         await TransitionAsync(id, p =>
         {
             var total = p.Questions.Count;
-            if (p.CurrentQuestionIndex + 1 >= total) { p.Status = PollStatus.Ended; p.IsActive = false; }
-            else p.CurrentQuestionIndex++;
+            if (p.CurrentQuestionIndex + 1 >= total) { p.Status = PollStatus.Ended; p.IsActive = false; p.QuestionStartedAt = null; }
+            else { p.CurrentQuestionIndex++; p.QuestionStartedAt = DateTime.UtcNow; }
         }, ct);
 
+    // Going back restarts the clock: the question is being put on screen again,
+    // and leaving the original start would hand everyone an expired question.
     public async Task<PollDto> PrevQuestionAsync(Guid id, CancellationToken ct) =>
         await TransitionAsync(id, p =>
         {
-            if (p.CurrentQuestionIndex > 0) p.CurrentQuestionIndex--;
+            if (p.CurrentQuestionIndex > 0) { p.CurrentQuestionIndex--; p.QuestionStartedAt = DateTime.UtcNow; }
         }, ct);
 
     public async Task<PollDto> EndAsync(Guid id, CancellationToken ct) =>
-        await TransitionAsync(id, p => { p.Status = PollStatus.Ended; p.IsActive = false; }, ct);
+        await TransitionAsync(id, p => { p.Status = PollStatus.Ended; p.IsActive = false; p.QuestionStartedAt = null; }, ct);
 
     public async Task<PollDto> JoinAsync(Guid id, JoinPollRequest req, CancellationToken ct)
     {
         await _joinValidator.ValidateAndThrowAsync(req, ct);
 
-        var poll = await _db.Polls.FirstOrDefaultAsync(p => p.Id == id, ct)
-                   ?? throw Errors.NotFound("Poll");
+        // A room fills up in bursts, so the tally is incremented in the UPDATE
+        // rather than read into memory and written back.
+        var joined = await _db.Polls
+            .Where(p => p.Id == id)
+            .ExecuteUpdateAsync(set => set.SetProperty(p => p.ParticipantCount, p => p.ParticipantCount + 1), ct);
 
-        poll.ParticipantCount++;
-        await _db.SaveChangesAsync(ct);
-        var dto = (await GetAsync(id, ct))!;
-        await _realtime.PollUpdatedAsync(id, dto);
-        return dto;
+        if (joined == 0) throw Errors.NotFound("Poll");
+
+        return await PublishAsync(id, ct);
     }
 
+    /// <summary>
+    /// Poll carries a row version, so a second writer that changed the poll
+    /// between our read and write makes EF throw rather than overwrite. A
+    /// double-clicked control is still the operator's intent, so the mutation is
+    /// reapplied to the state the winner left behind. Sustained contention gives
+    /// up with a conflict the caller can retry, never a 500.
+    /// </summary>
     private async Task<PollDto> TransitionAsync(Guid id, Action<Poll> mutate, CancellationToken ct)
     {
-        var poll = await _db.Polls.Include(p => p.Questions)
-                                  .FirstOrDefaultAsync(p => p.Id == id, ct)
-                   ?? throw Errors.NotFound("Poll");
-        EnsureOwner(poll);
-        mutate(poll);
-        poll.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
-        var dto = (await GetAsync(id, ct))!;
-        await _realtime.PollUpdatedAsync(id, dto);
-        return dto;
+        try
+        {
+            return await ConcurrentCounters.RetryOnConcurrencyAsync(async token =>
+            {
+                _db.ChangeTracker.Clear();
+
+                var poll = await _db.Polls.Include(p => p.Questions)
+                                          .FirstOrDefaultAsync(p => p.Id == id, token)
+                           ?? throw Errors.NotFound("Poll");
+                EnsureOwner(poll);
+                mutate(poll);
+                poll.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync(token);
+                return await PublishAsync(id, token);
+            }, maxAttempts: 3, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw Errors.Conflict("Someone else is controlling this poll right now. Try again.");
+        }
     }
+
+    /// <summary>
+    /// Broadcasts the new poll state to the (anonymous) hub group and returns the
+    /// state the caller is allowed to see.
+    /// </summary>
+    private async Task<PollDto> PublishAsync(Guid id, CancellationToken ct)
+    {
+        var poll = (await LoadAsync(id, ct))!;
+        var full = Map(poll);
+        var forAudience = AnswersAreRevealed(poll.Status) ? full : WithoutAnswers(full);
+
+        await _realtime.PollUpdatedAsync(id, forAudience);
+        return CanSeeAnswers(poll) ? full : forAudience;
+    }
+
+    private Task<Poll?> LoadAsync(Guid id, CancellationToken ct) =>
+        _db.Polls.Include(p => p.Creator)
+                 .Include(p => p.Questions).ThenInclude(q => q.Options)
+                 .AsNoTracking()
+                 .FirstOrDefaultAsync(p => p.Id == id, ct);
+
+    private PollDto MapForViewer(Poll poll)
+    {
+        var dto = Map(poll);
+        return CanSeeAnswers(poll) ? dto : WithoutAnswers(dto);
+    }
+
+    private bool CanSeeAnswers(Poll poll) =>
+        _user.IsAdmin
+        || (_user.UserId is Guid uid && poll.CreatorId == uid)
+        || AnswersAreRevealed(poll.Status);
+
+    // Participants may review the key once the session is over, but never while
+    // the poll is still collecting answers.
+    private static bool AnswersAreRevealed(PollStatus status) => status == PollStatus.Ended;
+
+    private static PollDto WithoutAnswers(PollDto dto) => dto with
+    {
+        Questions = dto.Questions
+            .Select(q => q with { CorrectOptionIndex = null, CorrectAnswer = null })
+            .ToList()
+    };
 
     private void EnsureOwner(Poll poll)
     {
@@ -175,9 +309,12 @@ public class PollService : IPollService
         throw Errors.Forbidden("Not the owner of this poll.");
     }
 
-    private static Question MapQuestion(QuestionInput q, int fallbackOrder) => new()
+    // Position wins over whatever index the payload carries: the order indices are
+    // unique per poll in the database, and a client that repeats or skips one would
+    // otherwise take the whole request down with a constraint violation.
+    private static Question MapQuestion(QuestionInput q, int order) => new()
     {
-        OrderIndex = q.OrderIndex >= 0 ? q.OrderIndex : fallbackOrder,
+        OrderIndex = order,
         Text = q.Text,
         ImageUrl = q.ImageUrl,
         TimeLimit = q.TimeLimit > 0 ? q.TimeLimit : 30,
@@ -189,13 +326,14 @@ public class PollService : IPollService
         MaxWords = q.MaxWords,
         WordCloudConfig = q.WordCloudConfig,
         Options = q.Options.OrderBy(o => o.OrderIndex)
-            .Select((o, idx) => new Option { OrderIndex = o.OrderIndex >= 0 ? o.OrderIndex : idx, Text = o.Text })
+            .Select((o, idx) => new Option { OrderIndex = idx, Text = o.Text })
             .ToList()
     };
 
     private static PollDto Map(Poll p) => new(
         p.Id, p.Title, p.Type, p.Status, p.CurrentQuestionIndex, p.ParticipantCount, p.IsActive,
         p.CreatorId, p.Creator?.Email ?? string.Empty, p.CreatedAt, p.UpdatedAt,
+        p.QuestionStartedAt, DateTime.UtcNow,
         p.Questions.OrderBy(q => q.OrderIndex).Select(q => new QuestionDto(
             q.Id, q.OrderIndex, q.Text, q.ImageUrl, q.TimeLimit, q.QuestionType,
             q.AllowMultiple, q.CorrectOptionIndex, q.CorrectAnswer, q.Points,

@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OpenQuiz.Api.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using OpenQuiz.Application.Abstractions;
+using OpenQuiz.Application.Common;
 using OpenQuiz.Application.Polls;
 
 namespace OpenQuiz.Api.Controllers;
@@ -14,8 +17,10 @@ public class PollsController : ControllerBase
 
     [Authorize]
     [HttpGet]
-    public async Task<ActionResult<List<PollDto>>> List(CancellationToken ct) => Ok(await _polls.ListAsync(ct));
+    public async Task<ActionResult<PagedResult<PollSummaryDto>>> List([FromQuery] PageRequest paging, CancellationToken ct)
+        => Ok(await _polls.ListAsync(paging, ct));
 
+    [EnableRateLimiting(RateLimitPolicies.Participation)]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PollDto>> Get(Guid id, CancellationToken ct)
     {
@@ -32,6 +37,12 @@ public class PollsController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<PollDto>> Update(Guid id, [FromBody] UpdatePollRequest req, CancellationToken ct)
         => Ok(await _polls.UpdateAsync(id, req, ct));
+
+    [Authorize]
+    [HttpPost("{id:guid}/duplicate")]
+    public async Task<ActionResult<PollDto>> Duplicate(
+        Guid id, [FromBody] DuplicatePollRequest? req, CancellationToken ct)
+        => Ok(await _polls.DuplicateAsync(id, req ?? new DuplicatePollRequest(), ct));
 
     [Authorize]
     [HttpDelete("{id:guid}")]
@@ -61,6 +72,7 @@ public class PollsController : ControllerBase
     public async Task<ActionResult<PollDto>> End(Guid id, CancellationToken ct)
         => Ok(await _polls.EndAsync(id, ct));
 
+    [EnableRateLimiting(RateLimitPolicies.Participation)]
     [HttpPost("{id:guid}/join")]
     public async Task<ActionResult<PollDto>> Join(Guid id, [FromBody] JoinPollRequest req, CancellationToken ct)
         => Ok(await _polls.JoinAsync(id, req, ct));

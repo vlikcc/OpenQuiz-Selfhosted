@@ -12,11 +12,12 @@ public class VoteConfiguration : IEntityTypeConfiguration<Vote>
         b.HasKey(x => x.Id);
         b.Property(x => x.UserName).IsRequired().HasMaxLength(128);
         b.Property(x => x.SelectedOptionIndices).IsRequired().HasMaxLength(256);
+        b.Property(x => x.VoterKey).IsRequired().HasMaxLength(160);
 
         b.HasIndex(x => x.PollId);
-        b.HasIndex(x => new { x.QuestionId, x.UserId })
-            .IsUnique()
-            .HasFilter("[UserId] IS NOT NULL");
+        // Backstop for concurrent double submits; the service checks first so
+        // the common case gets a friendly conflict rather than a constraint error.
+        b.HasIndex(x => new { x.QuestionId, x.VoterKey }).IsUnique();
         b.HasIndex(x => new { x.QuestionId, x.UserName });
     }
 }

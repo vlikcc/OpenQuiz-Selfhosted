@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback } from 'react';
 import { Trophy, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -10,12 +10,18 @@ import { tokenStore } from './services/tokenStore';
 
 import VoterMode from './components/VoterMode';
 import Dashboard from './components/Dashboard';
-import PresenterMode from './components/PresenterMode';
-import AdminPanel from './components/AdminPanel';
 import TabBar from './components/TabBar';
 import AuthScreen from './components/AuthScreen';
 import ProfileScreen from './components/ProfileScreen';
 import LandingPage from './components/LandingPage';
+import LoadingPanel from './components/LoadingPanel';
+import ResetPasswordScreen from './components/ResetPasswordScreen';
+import { isPasswordResetPath, resetTokenFromSearch } from './utils/resetRoute';
+
+// The presenter pulls in the charting stack and the admin panel is reachable by
+// a handful of accounts, so neither belongs in the bundle every voter downloads.
+const PresenterMode = lazy(() => import('./components/PresenterMode'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
 
 const urlParams = new URLSearchParams(window.location.search);
 const isVoterMode = urlParams.get('mode') === 'voter' && !!urlParams.get('id');
@@ -79,8 +85,13 @@ export default function App() {
   const [activeScreen, setActiveScreen] = useState('tabs');
   const [activePollId, setActivePollId] = useState(() => initialPollId || localStorage.getItem('activePollId'));
   const [toast, setToast] = useState(null);
-  const [isCreating, setIsCreating] = useState(false);
+  // null when the dashboard is showing the poll list, otherwise the poll being
+  // composed: { contentType, pollId } with a null pollId for a new one.
+  const [composer, setComposer] = useState(null);
   const [showLandingPage, setShowLandingPage] = useState(true);
+  // The reset e-mail lands on this same SPA; once the form is done we drop
+  // the path so the next render is the ordinary landing / sign-in screen.
+  const [leaveReset, setLeaveReset] = useState(false);
 
   // QR voter preload
   useEffect(() => {
@@ -103,9 +114,11 @@ export default function App() {
     else setActiveScreen(screen);
   }, []);
 
+  // Leaving or re-entering the create tab always starts a fresh poll, otherwise
+  // a poll left mid-edit would reappear behind the "Create" button.
   const handleTabChange = (tab) => {
-    if (tab === 'create') { setIsCreating(true); setActiveTab('dashboard'); }
-    else { setIsCreating(false); setActiveTab(tab); }
+    if (tab === 'create') { setComposer({ contentType: 'contest', pollId: null }); setActiveTab('dashboard'); }
+    else { setComposer(null); setActiveTab(tab); }
   };
 
   const handleGoogleLogin = async (idToken) => {
@@ -139,6 +152,21 @@ export default function App() {
   const handlePasswordReset = async (email) => {
     await authService.passwordResetRequest(email);
   };
+
+  if (isPasswordResetPath(window.location.pathname) && !leaveReset) {
+    return (
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
+        <ResetPasswordScreen
+          token={resetTokenFromSearch(window.location.search)}
+          onFinished={() => {
+            window.history.replaceState({}, '', '/');
+            setLeaveReset(true);
+            setShowLandingPage(false);
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
 
   // QR Voter Mode
   if (isVoterMode && initialPollId) {
@@ -192,12 +220,13 @@ export default function App() {
     return (
       <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
         <div className="h-full w-full flex flex-col overflow-hidden">
-          <PresenterMode
-            pollId={activePollId}
-            onExit={() => navigate('dashboard')}
-            onSwitchToVoter={() => navigate('voter')}
-            showToast={showToast}
-          />
+          <Suspense fallback={<LoadingPanel dark />}>
+            <PresenterMode
+              pollId={activePollId}
+              onExit={() => navigate('dashboard')}
+              showToast={showToast}
+            />
+          </Suspense>
         </div>
         {toast && (
           <div className={`fixed bottom-6 right-6 px-6 py-3 rounded-lg shadow-lg text-white font-medium flex items-center gap-2 animate-bounce-in z-50 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-800'}`}>
@@ -228,7 +257,9 @@ export default function App() {
             <h1 className="font-bold">{t('admin.title')}</h1>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <AdminPanel showToast={showToast} />
+            <Suspense fallback={<LoadingPanel />}>
+              <AdminPanel showToast={showToast} />
+            </Suspense>
           </div>
         </div>
       </ErrorBoundary>
@@ -253,22 +284,21 @@ export default function App() {
               showToast={showToast}
               isAdmin={isAdmin}
               isAuthorized={isAuthorized}
-              isCreating={isCreating}
-              setIsCreating={setIsCreating}
+              composer={composer}
+              setComposer={setComposer}
             />
           )}
           {activeTab === 'profile' && (
             <ProfileScreen
               user={user}
               isAdmin={isAdmin}
-              isAuthorized={isAuthorized}
               onLogout={handleLogout}
               onNavigateToAdmin={() => setActiveScreen('admin')}
             />
           )}
         </div>
 
-        <TabBar activeTab={activeTab} onTabChange={handleTabChange} isAdmin={isAdmin} />
+        <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     </ErrorBoundary>
   );

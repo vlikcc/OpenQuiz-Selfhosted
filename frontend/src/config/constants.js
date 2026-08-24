@@ -32,11 +32,42 @@ export const POLL_STATUS_KEY = Object.fromEntries(
   Object.entries(POLL_STATUS_VALUE).map(([k, v]) => [v, k]),
 );
 
+// Tailwind's JIT compiler only emits classes it can find as complete literals in
+// the source, so per-type colors must be written out instead of interpolated.
+const TYPE_CLASSES = {
+  indigo: {
+    solid: 'bg-indigo-600 hover:bg-indigo-700',
+    soft: 'bg-indigo-50 text-indigo-700',
+    badge: 'bg-indigo-100 text-indigo-700',
+  },
+  emerald: {
+    solid: 'bg-emerald-600 hover:bg-emerald-700',
+    soft: 'bg-emerald-50 text-emerald-700',
+    badge: 'bg-emerald-100 text-emerald-700',
+  },
+  amber: {
+    solid: 'bg-amber-600 hover:bg-amber-700',
+    soft: 'bg-amber-50 text-amber-700',
+    badge: 'bg-amber-100 text-amber-700',
+  },
+  rose: {
+    solid: 'bg-rose-600 hover:bg-rose-700',
+    soft: 'bg-rose-50 text-rose-700',
+    badge: 'bg-rose-100 text-rose-700',
+  },
+  sky: {
+    solid: 'bg-sky-600 hover:bg-sky-700',
+    soft: 'bg-sky-50 text-sky-700',
+    badge: 'bg-sky-100 text-sky-700',
+  },
+};
+
 export const CONTENT_TYPES = {
   contest: {
     label: 'Yarışma',
     icon: '🏆',
     color: 'indigo',
+    classes: TYPE_CLASSES.indigo,
     description: 'Doğru cevaplı sorular, puanlama sistemi',
     hasCorrectAnswer: true,
     multipleQuestions: true,
@@ -46,6 +77,7 @@ export const CONTENT_TYPES = {
     label: 'Anket',
     icon: '📊',
     color: 'emerald',
+    classes: TYPE_CLASSES.emerald,
     description: 'Fikir toplama, doğru cevap yok',
     hasCorrectAnswer: false,
     multipleQuestions: true,
@@ -55,6 +87,7 @@ export const CONTENT_TYPES = {
     label: 'Quiz',
     icon: '❓',
     color: 'amber',
+    classes: TYPE_CLASSES.amber,
     description: 'Tek sorulu hızlı test',
     hasCorrectAnswer: true,
     multipleQuestions: true,
@@ -64,6 +97,7 @@ export const CONTENT_TYPES = {
     label: 'Sınav',
     icon: '📝',
     color: 'rose',
+    classes: TYPE_CLASSES.rose,
     description: 'Çoktan seçmeli ve açık uçlu sorular, KaTeX formül desteği',
     hasCorrectAnswer: true,
     multipleQuestions: true,
@@ -74,6 +108,7 @@ export const CONTENT_TYPES = {
     label: 'Kelime Bulutu',
     icon: '☁️',
     color: 'sky',
+    classes: TYPE_CLASSES.sky,
     description: 'Katılımcıların yazdığı kelimelerden anlık bulut',
     hasCorrectAnswer: false,
     multipleQuestions: true,

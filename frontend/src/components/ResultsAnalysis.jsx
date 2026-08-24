@@ -1,37 +1,69 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Trophy, Users, BarChart3, Download, FileSpreadsheet, FileText } from 'lucide-react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import { Suspense, lazy, useState, useEffect, useMemo } from 'react';
+import { Trophy, Users, BarChart3, Download, FileSpreadsheet, FileText, MessageSquare, Cloud } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { voteService } from '../services/voteService';
 import { scoreService } from '../services/scoreService';
+import { wordcloudService } from '../services/wordcloudService';
 import { CONTENT_TYPES, POLL_TYPE_KEY, QUESTION_TYPE_KEY } from '../config/constants';
 import { useTranslation } from 'react-i18next';
+import OpenAnswerList from './OpenAnswerList';
+import Leaderboard from './Leaderboard';
+
+const WordCloudCanvas = lazy(() => import('./wordcloud/WordCloudCanvas'));
 
 const CHART_COLORS = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#3B82F6', '#EF4444', '#14B8A6'];
+
+function optionText(question, index) {
+  return question?.options?.[index]?.text ?? `#${index + 1}`;
+}
 
 export default function ResultsAnalysis({ poll, pollId, onClose }) {
   const { t } = useTranslation();
   const [aggregates, setAggregates] = useState([]);
   const [openAnswers, setOpenAnswers] = useState([]);
+  const [votes, setVotes] = useState([]);
+  const [clouds, setClouds] = useState([]);
   const [scores, setScores] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [chartType, setChartType] = useState('bar');
 
   useEffect(() => {
-    if (!pollId) return;
-    voteService.aggregates(pollId).then(setAggregates).catch(() => {});
-    voteService.listOpen(pollId).then(setOpenAnswers).catch(() => {});
-    scoreService.leaderboard(pollId).then(setScores).catch(() => {});
-  }, [pollId]);
+    if (!pollId || !poll) return undefined;
+
+    let current = true;
+    voteService.aggregates(pollId).then((rows) => { if (current) setAggregates(rows); }).catch(() => {});
+    voteService.allOpen(pollId).then((rows) => { if (current) setOpenAnswers(rows); }).catch(() => {});
+    voteService.allVotes(pollId).then((rows) => { if (current) setVotes(rows); }).catch(() => {});
+    scoreService.leaderboard(pollId).then((rows) => { if (current) setScores(rows); }).catch(() => {});
+
+    const cloudQuestions = (poll.questions || [])
+      .map((q, i) => ({ q, i }))
+      .filter(({ q }) => QUESTION_TYPE_KEY[q.questionType] === 'wordcloud');
+
+    if (cloudQuestions.length) {
+      Promise.all(cloudQuestions.map(({ q, i }) =>
+        wordcloudService.get(pollId, i).then((data) => ({
+          questionIndex: i,
+          question: q.text,
+          terms: data.terms || [],
+        }))))
+        .then((rows) => { if (current) setClouds(rows); })
+        .catch(() => {});
+    }
+
+    return () => { current = false; };
+  }, [pollId, poll]);
 
   const typeKey = poll ? POLL_TYPE_KEY[poll.type] : null;
   const typeConfig = typeKey ? CONTENT_TYPES[typeKey] : CONTENT_TYPES.contest;
 
+  const questionsById = useMemo(
+    () => Object.fromEntries((poll?.questions || []).map((q) => [q.id, q])),
+    [poll],
+  );
+
   const analytics = useMemo(() => {
-    if (!poll || aggregates.length === 0) return null;
-    const totalParticipants = Math.max(...aggregates.map((a) => a.totalRespondents || 0), 0);
+    if (!poll) return null;
     const questionAnalysis = poll.questions.map((q, i) => {
       const agg = aggregates.find((a) => a.questionIndex === i);
       const total = agg?.totalRespondents || 0;
@@ -41,39 +73,99 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
         percentage: total > 0 ? Math.round(((agg?.optionCounts?.[oi] || 0) / total) * 100) : 0,
         isCorrect: q.correctOptionIndex === oi,
       }));
-      return { question: q.text, total, options: opts };
+      return {
+        question: q.text,
+        questionId: q.id,
+        questionType: QUESTION_TYPE_KEY[q.questionType] || 'multiple',
+        total,
+        options: opts,
+      };
     });
+    const respondentTotals = questionAnalysis.map((q) => q.total);
+    const totalParticipants = respondentTotals.length ? Math.max(...respondentTotals, poll.participantCount || 0) : (poll.participantCount || 0);
     return { totalParticipants, questionAnalysis };
   }, [poll, aggregates]);
 
-  const handleExportPdf = () => {
-    const doc = new jsPDF();
-    doc.text(poll.title, 14, 16);
-    doc.autoTable({
-      head: [['#', t('results.pdfUser'), t('results.pdfScore'), t('results.pdfTime')]],
-      body: scores.map((s, i) => [i + 1, s.userName, s.points, s.totalTimeMs]),
-      startY: 24,
-    });
-    doc.save(`${poll.title || 'report'}.pdf`);
+  const openByQuestion = useMemo(() => {
+    const groups = new Map();
+    for (const answer of openAnswers) {
+      const list = groups.get(answer.questionId) || [];
+      list.push(answer);
+      groups.set(answer.questionId, list);
+    }
+    return groups;
+  }, [openAnswers]);
+
+  const reportLabels = {
+    user: t('results.pdfUser'),
+    score: t('results.pdfScore'),
+    time: t('results.pdfTime'),
+    sheet: t('results.sheetScores'),
+    question: t('results.colQuestion'),
+    option: t('results.colOption'),
+    votes: t('results.colVotes'),
+    percentage: t('results.colPercent'),
+    correct: t('results.colCorrect'),
+    yes: t('common.yes'),
+    no: t('common.no'),
+    answer: t('results.colAnswer'),
+    term: t('results.colTerm'),
+    count: t('results.colCount'),
+    selections: t('results.colSelections'),
+    sheetQuestions: t('results.sheetQuestions'),
+    sheetOpen: t('results.sheetOpen'),
+    sheetCloud: t('results.sheetCloud'),
+    sheetVotes: t('results.sheetVotes'),
+    notMultipleChoice: t('results.notMultipleChoice'),
   };
 
-  const handleExportExcel = () => {
-    const data = [
-      [t('results.pdfUser'), t('results.pdfScore'), t('results.pdfTime')],
-      ...scores.map((s) => [s.userName, s.points, s.totalTimeMs]),
-    ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), t('results.sheetScores'));
-    XLSX.writeFile(wb, `${poll.title || 'report'}.xlsx`);
+  const extras = useMemo(() => ({
+    questions: analytics?.questionAnalysis ?? [],
+    openAnswers: openAnswers.map((a) => ({
+      question: questionsById[a.questionId]?.text || a.questionId,
+      userName: a.userName,
+      answerText: a.answerText,
+      score: a.score,
+    })),
+    wordClouds: clouds,
+    votes: votes.map((v) => ({
+      userName: v.userName,
+      question: questionsById[v.questionId]?.text || v.questionId,
+      selections: (v.selectedIndices || []).map((i) => optionText(questionsById[v.questionId], i)),
+      isCorrect: v.isCorrect,
+      responseTimeMs: v.responseTimeMs,
+    })),
+  }), [analytics, openAnswers, clouds, votes, questionsById]);
+
+  const exportReport = async () => import('../utils/scoreReport');
+
+  const handleExportPdf = async () => {
+    const { buildScoreReportPdf, saveScoreReportPdf } = await exportReport();
+    saveScoreReportPdf(buildScoreReportPdf(poll.title, scores, reportLabels, extras), poll.title);
+  };
+
+  const handleExportExcel = async () => {
+    const { buildScoreReportWorkbook, saveScoreReportWorkbook } = await exportReport();
+    saveScoreReportWorkbook(buildScoreReportWorkbook(scores, reportLabels, extras), poll.title);
+  };
+
+  const handleExportCsv = async () => {
+    const { buildScoreReportCsv, saveScoreReportCsv } = await exportReport();
+    saveScoreReportCsv(buildScoreReportCsv(scores, reportLabels, extras), poll.title);
   };
 
   if (!poll) return null;
+
+  const openQuestions = (poll.questions || []).filter((q) => QUESTION_TYPE_KEY[q.questionType] === 'open');
+  const hasOpen = openQuestions.length > 0 || openAnswers.length > 0;
+  const hasClouds = clouds.length > 0 || (poll.questions || []).some((q) => QUESTION_TYPE_KEY[q.questionType] === 'wordcloud');
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto">
       <header className="bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-10">
         <h2 className="font-bold text-lg">📊 {t('results.title', { title: poll.title })}</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end">
+          <button onClick={handleExportCsv} className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm flex items-center gap-1"><Download size={16} /> CSV</button>
           <button onClick={handleExportExcel} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm flex items-center gap-1"><FileSpreadsheet size={16} /> Excel</button>
           <button onClick={handleExportPdf} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-sm flex items-center gap-1"><FileText size={16} /> PDF</button>
           <button onClick={onClose} className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm">{t('common.close')}</button>
@@ -81,10 +173,22 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
       </header>
 
       <div className="p-6 max-w-5xl mx-auto">
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           <button onClick={() => setActiveTab('overview')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'overview' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><BarChart3 size={16} className="inline mr-1" /> {t('results.questionsTab')}</button>
           {typeConfig.hasCorrectAnswer && (
             <button onClick={() => setActiveTab('leaderboard')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'leaderboard' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><Trophy size={16} className="inline mr-1" /> {t('results.leaderboardTab')}</button>
+          )}
+          {hasOpen && (
+            <button onClick={() => setActiveTab('open')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'open' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><MessageSquare size={16} className="inline mr-1" /> {t('results.openTab', { n: openAnswers.length })}</button>
+          )}
+          {hasClouds && (
+            <button onClick={() => setActiveTab('cloud')} className={`px-4 py-2 rounded-lg text-sm ${activeTab === 'cloud' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}><Cloud size={16} className="inline mr-1" /> {t('results.cloudTab')}</button>
+          )}
+          {activeTab === 'overview' && (
+            <div className="ml-auto flex gap-2">
+              <button onClick={() => setChartType('bar')} className={`px-3 py-2 rounded-lg text-sm ${chartType === 'bar' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>{t('results.barChart')}</button>
+              <button onClick={() => setChartType('pie')} className={`px-3 py-2 rounded-lg text-sm ${chartType === 'pie' ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200'}`}>{t('results.pieChart')}</button>
+            </div>
           )}
         </div>
 
@@ -101,9 +205,13 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
         {activeTab === 'overview' && analytics && (
           <div className="space-y-4">
             {analytics.questionAnalysis.map((qa, i) => (
-              <div key={i} className="bg-white rounded-xl p-4 border border-slate-200">
+              <div key={qa.questionId || i} className="bg-white rounded-xl p-4 border border-slate-200">
                 <h3 className="font-bold mb-3">{t('results.questionLabel', { n: i + 1, text: qa.question })}</h3>
-                {qa.options.length > 0 ? (
+                {qa.questionType === 'open' ? (
+                  <p className="text-slate-400 italic text-sm">{t('results.seeOpenTab', { n: openByQuestion.get(qa.questionId)?.length || 0 })}</p>
+                ) : qa.questionType === 'wordcloud' ? (
+                  <p className="text-slate-400 italic text-sm">{t('results.seeCloudTab')}</p>
+                ) : qa.options.length > 0 ? (
                   <ResponsiveContainer width="100%" height={Math.max(qa.options.length * 40, 160)}>
                     {chartType === 'pie' ? (
                       <PieChart>
@@ -132,35 +240,53 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
                 )}
               </div>
             ))}
+            {analytics.questionAnalysis.length === 0 && (
+              <p className="text-slate-400 text-center py-8">{t('results.empty')}</p>
+            )}
           </div>
         )}
 
         {activeTab === 'leaderboard' && (
-          <div className="bg-white rounded-xl border border-slate-200 divide-y">
-            {scores.map((s, i) => (
-              <div key={s.userName} className="p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-slate-400 w-8">{i + 1}</span>
-                  <span className="font-medium">{s.userName}</span>
-                </div>
-                <span className="font-bold text-indigo-600">{t('results.points', { n: s.points })}</span>
-              </div>
-            ))}
-            {scores.length === 0 && <p className="p-4 text-slate-400 text-center">{t('results.noScores')}</p>}
+          <div className="bg-white rounded-xl p-4 border border-slate-200">
+            <Leaderboard entries={scores} tone="light" />
           </div>
         )}
 
-        {openAnswers.length > 0 && (
-          <div className="mt-6 bg-white rounded-xl p-4 border border-slate-200">
-            <h3 className="font-bold mb-3">{t('results.openAnswers', { n: openAnswers.length })}</h3>
-            <ul className="space-y-2">
-              {openAnswers.map((a) => (
-                <li key={a.id} className="bg-slate-50 rounded-lg p-2 text-sm">
-                  <span className="text-slate-400 text-xs">{a.userName}: </span>
-                  {a.answerText}
-                </li>
-              ))}
-            </ul>
+        {activeTab === 'open' && (
+          <div className="space-y-4">
+            {openQuestions.length === 0 && openAnswers.length === 0 && (
+              <p className="text-slate-400 text-center py-8">{t('presenter.noAnswers')}</p>
+            )}
+            {(openQuestions.length ? openQuestions : [{ id: null, text: t('results.openAnswers', { n: openAnswers.length }), points: 10 }]).map((q, i) => (
+              <div key={q.id || i} className="bg-white rounded-xl p-4 border border-slate-200">
+                <h3 className="font-bold mb-3">{q.text}</h3>
+                <OpenAnswerList
+                  answers={q.id ? (openByQuestion.get(q.id) || []) : openAnswers}
+                  maxPoints={q.points || 10}
+                  tone="light"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'cloud' && (
+          <div className="space-y-4">
+            {clouds.length === 0 && <p className="text-slate-400 text-center py-8">{t('results.noCloud')}</p>}
+            {clouds.map((cloud) => (
+              <div key={cloud.questionIndex} className="bg-white rounded-xl p-4 border border-slate-200">
+                <h3 className="font-bold mb-3">{cloud.question}</h3>
+                {cloud.terms.length === 0 ? (
+                  <p className="text-slate-400 italic text-sm">{t('presenter.noJoin')}</p>
+                ) : (
+                  <div className="h-[320px]">
+                    <Suspense fallback={null}>
+                      <WordCloudCanvas terms={cloud.terms} width={900} height={320} />
+                    </Suspense>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
