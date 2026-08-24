@@ -42,10 +42,20 @@ Three containers come up:
 | Service | Default port | Notes |
 |---|---|---|
 | `db` (SQL Server 2022) | `1433` | data persisted in `mssql-data` volume |
-| `api` (.NET 10 / Kestrel) | `5080` | applies EF migrations on boot |
+| `api` (.NET 10 / Kestrel) | `5080` | applies EF migrations on boot, logs to `api-logs` volume |
 | `web` (nginx + React build) | `8080` | SPA served from `/usr/share/nginx/html` |
 
 Open the app at `http://localhost:8080`.
+
+All three run as non-root (`app`, `nginx`, `mssql`), start with
+`no-new-privileges`, restart `unless-stopped`, and carry a healthcheck. `web`
+additionally runs with a read-only root filesystem. The `api` container waits
+for `db` to report healthy, and `web` waits for `api`, so the first request
+after `up` never lands on a half-started stack.
+
+CPU and memory ceilings come from `.env` (`API_MEMORY_LIMIT`, `DB_CPU_LIMIT`,
+…). SQL Server refuses to start below 2 GB, so keep `DB_MEMORY_LIMIT` above
+that.
 
 ## 4. First admin
 
@@ -66,6 +76,35 @@ docker compose up -d --build
 # wipe & restart (DESTRUCTIVE — drops all data)
 docker compose down -v
 ```
+
+### Health probes
+
+| Endpoint | Answers | Use it for |
+|---|---|---|
+| `/health/live` | Is the process running? Never touches the database. | Restart / liveness probes |
+| `/health/ready` | Can this instance serve traffic? Opens a database connection. | Load-balancer and startup gates |
+| `/health` | Same as `/health/ready`. | Existing probes |
+
+Keep liveness off the database. A probe that fails during a database outage
+restarts every API instance in a loop, which turns a recoverable outage into a
+total one.
+
+### Logs
+
+The API writes to stdout (`docker compose logs -f api`) *and* to a daily
+rolling file under `/app/logs`, mounted as the `api-logs` volume so it survives
+a container restart. Files roll at 50 MB and the last 14 are kept.
+
+```bash
+# read the current file
+docker compose exec api sh -c 'tail -f /app/logs/openquiz-*.log'
+
+# copy the whole history out
+docker compose cp api:/app/logs ./api-logs
+```
+
+Health probes log at Debug so they do not drown the requests you are looking
+for. Raise `Serilog__MinimumLevel__Default=Debug` to see them.
 
 ## 6. Rate limiting
 
@@ -126,15 +165,105 @@ Vote-count and word-cloud broadcasts are coalesced per process, so N instances
 can emit up to N batches per window instead of one. That trades a little extra
 traffic for correctness and needs no configuration.
 
-## 8. Customizing
+## 8. Metrics and traces
+
+Instrumentation is registered only when there is somewhere to send it, so the
+default deployment pays nothing for it.
+
+```bash
+# Prometheus scrape endpoint on the API port
+PROMETHEUS_ENABLED=true      # exposes http://api:8080/metrics
+
+# or push to an OpenTelemetry collector (metrics + traces)
+OTLP_ENDPOINT=http://otel-collector:4317
+```
+
+Both can be on at once. What you get: ASP.NET Core request duration and count
+by route and status, `HttpClient` call timings, and .NET runtime counters (GC,
+thread pool, exceptions).
+
+`/metrics` has no authentication. It exposes route names and status-code
+distributions, which is not a secret but is not something to publish either —
+leave the `5080` mapping bound to localhost, or scrape it over the Compose
+network only.
+
+## 9. Backing up the database
+
+Everything durable lives in the `mssql-data` volume. There are two ways to
+protect it; the first is the one to use in production.
+
+### Native SQL Server backup (recommended)
+
+A `.bak` is transactionally consistent and can be restored into any SQL Server
+2022 instance, including one running elsewhere.
+
+```bash
+# Back up (writes inside the volume, then copies out)
+docker compose exec db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -No \
+  -Q "BACKUP DATABASE OpenQuiz TO DISK='/var/opt/mssql/data/OpenQuiz.bak' WITH INIT, COMPRESSION, CHECKSUM"
+
+docker compose cp db:/var/opt/mssql/data/OpenQuiz.bak ./OpenQuiz-$(date +%F).bak
+```
+
+```bash
+# Restore into a running stack
+docker compose cp ./OpenQuiz-2026-01-31.bak db:/var/opt/mssql/data/restore.bak
+
+docker compose stop api   # no writers during the restore
+
+docker compose exec db /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -No \
+  -Q "ALTER DATABASE OpenQuiz SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+      RESTORE DATABASE OpenQuiz FROM DISK='/var/opt/mssql/data/restore.bak' WITH REPLACE;
+      ALTER DATABASE OpenQuiz SET MULTI_USER;"
+
+docker compose start api
+```
+
+The API applies any pending EF migrations on the next boot, so restoring an
+older backup into a newer build is safe.
+
+### Volume snapshot (whole-machine moves)
+
+Copying the files underneath a running SQL Server produces a backup that may
+not restore, so stop the database first.
+
+```bash
+docker compose down                                  # stop every writer
+
+docker run --rm -v openquiz_mssql-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/mssql-data-$(date +%F).tgz -C /data .
+
+docker compose up -d
+```
+
+```bash
+# Restore into an empty volume
+docker compose down -v
+docker volume create openquiz_mssql-data
+docker run --rm -v openquiz_mssql-data:/data -v "$PWD":/backup alpine \
+  sh -c 'tar xzf /backup/mssql-data-2026-01-31.tgz -C /data && chown -R 10001:0 /data'
+docker compose up -d
+```
+
+The volume name is prefixed with the Compose project (the directory name), so
+check `docker volume ls` if `openquiz_mssql-data` does not exist.
+
+Whichever route you take, **restore into a throwaway stack once before you
+need it**. An untested backup is not a backup.
+
+## 10. Customizing
 
 - **Different domain / TLS** — put nginx/Caddy/Traefik in front, terminate TLS there, set
   `PUBLIC_URL` and `VITE_API_BASE_URL` accordingly, rebuild `web`.
 - **External DB** — drop the `db` service, point `ConnectionStrings__Default` at your
   managed SQL Server.
 - **Disable email** — leave `SMTP_HOST` blank. Password-reset endpoint then returns 503.
+- **API on another origin** — the bundled `web` container proxies `/api` and `/hubs`, so
+  the shipped Content-Security-Policy only allows `connect-src 'self'`. If you point
+  `VITE_API_BASE_URL` at a different host, add that origin to `connect-src` in
+  `frontend/security-headers.conf` and rebuild `web`, or the browser blocks every call.
 
-## 9. Troubleshooting
+## 11. Troubleshooting
 
 - `db` keeps restarting → the SA password fails MSSQL's complexity policy. Pick a 8+ char
   password with upper/lower/digit/symbol.
@@ -142,3 +271,6 @@ traffic for correctness and needs no configuration.
 - `Google ile giriş başarısız` — your `GOOGLE_CLIENT_ID` doesn't list the current origin
   in **Authorized JavaScript origins**.
 - `SMTP is not configured on this server` (503) — expected when `SMTP_HOST` is blank.
+- Blank page and `Refused to connect …` in the browser console — the Content-Security-Policy
+  in `frontend/security-headers.conf` does not list the origin you moved the API to. See
+  **Customizing** above.
