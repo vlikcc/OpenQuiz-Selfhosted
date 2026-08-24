@@ -41,6 +41,9 @@ public abstract class ApiTestBase : IAsyncLifetime
 
     protected OpenQuizDbContext CreateDbContext() => _sql.CreateDbContext();
 
+    /// <summary>For tests that need a second host pointed at the same database.</summary>
+    protected string ConnectionString => _sql.ConnectionString;
+
     protected static string UniqueEmail(string prefix = "user") => $"{prefix}-{Guid.NewGuid():N}@openquiz.test";
 
     protected const string ValidPassword = "Sup3rSecret!";

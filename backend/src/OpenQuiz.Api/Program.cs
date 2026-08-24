@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using OpenQuiz.Api.Auth;
+using OpenQuiz.Api.Diagnostics;
 using OpenQuiz.Api.Hubs;
 using Microsoft.AspNetCore.HttpOverrides;
 using OpenQuiz.Api.Middleware;
@@ -15,10 +16,13 @@ using OpenQuiz.Infrastructure;
 using OpenQuiz.Infrastructure.Options;
 using OpenQuiz.Infrastructure.Persistence;
 using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Logging (Serilog) ---
+// Console keeps `docker logs` useful; the rolling file survives a container
+// restart, which is the only copy an operator has after a crash loop.
 builder.Host.UseSerilog((ctx, lc) => lc
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()
@@ -33,7 +37,12 @@ builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
-builder.Services.AddHealthChecks();
+builder.Services.AddOpenQuizHealthChecks();
+
+// --- Metrics and traces (only when an exporter is configured) ---
+var observability = builder.Configuration.GetSection(ObservabilityOptions.SectionName).Get<ObservabilityOptions>()
+                    ?? new ObservabilityOptions();
+builder.Services.AddOpenQuizObservability(observability);
 
 // --- Realtime (optionally fanned out across API instances) ---
 var realtime = builder.Configuration.GetSection(RealtimeOptions.SectionName).Get<RealtimeOptions>()
@@ -157,7 +166,15 @@ if (builder.Configuration.GetValue("App:AutoMigrate", true))
 
 if (rateLimits.TrustForwardedHeaders) app.UseForwardedHeaders();
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(opts =>
+{
+    // Probes hit every few seconds forever. At Information they bury the
+    // requests an operator is actually reading the log for.
+    opts.GetLevel = (ctx, _, ex) =>
+        ex is not null || ctx.Response.StatusCode >= 500 ? LogEventLevel.Error
+        : ctx.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Debug
+        : LogEventLevel.Information;
+});
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -172,7 +189,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapOpenQuizHealthChecks();
+app.MapOpenQuizMetrics(observability);
 app.MapHub<PollHub>("/hubs/poll");
 
 app.Run();
