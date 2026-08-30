@@ -111,4 +111,13 @@ public static class PlanCatalog
     }
 
     public static IReadOnlyCollection<PlanDefinition> All => (IReadOnlyCollection<PlanDefinition>)Plans.Values;
+
+    /// <summary>
+    /// Plans a customer can actually buy. Free is the default, unlimited and
+    /// selfhosted_pro are grants — none of those belong on a checkout form.
+    /// </summary>
+    public static bool IsPurchasable(string? planCode) =>
+        planCode is not null
+        && (planCode.Equals(Pro, StringComparison.OrdinalIgnoreCase)
+            || planCode.Equals(Team, StringComparison.OrdinalIgnoreCase));
 }

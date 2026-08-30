@@ -16,4 +16,7 @@ export const pollService = {
   prevQuestion: (id) => api.post(`/api/polls/${id}/prev-question`),
   end: (id) => api.post(`/api/polls/${id}/end`),
   join: (id, userName) => api.post(`/api/polls/${id}/join`, { userName }, { auth: false }),
+
+  /** Owner-only dump for CSV/Excel/PDF. Gated on reports.export (402). */
+  report: (id) => api.get(`/api/polls/${id}/report`),
 };

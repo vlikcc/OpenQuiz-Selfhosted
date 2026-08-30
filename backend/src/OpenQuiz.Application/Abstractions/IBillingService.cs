@@ -13,4 +13,8 @@ public interface IBillingService
     /// wired up — a customer wires money, an admin flips their plan here.
     /// </summary>
     Task SetAccountPlanAsync(Guid userId, string planCode, CancellationToken ct);
+
+    Task<CheckoutSessionDto> CreateCheckoutAsync(CreateCheckoutApiRequest req, CancellationToken ct);
+    Task CancelMineAsync(CancelSubscriptionRequest req, CancellationToken ct);
 }
+

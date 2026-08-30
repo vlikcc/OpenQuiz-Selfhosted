@@ -16,6 +16,9 @@ vi.mock('../services/voteService', () => ({
 vi.mock('../services/wordcloudService', () => ({ wordcloudService: { submit: vi.fn() } }));
 vi.mock('../services/reactionService', () => ({ reactionService: { send: vi.fn() } }));
 vi.mock('../services/realtimeService', () => ({ realtimeService: { subscribe: vi.fn() } }));
+vi.mock('../services/brandingService', () => ({
+  brandingService: { getForPoll: vi.fn(() => Promise.resolve(null)) },
+}));
 
 const POLL_ID = 'poll-1';
 

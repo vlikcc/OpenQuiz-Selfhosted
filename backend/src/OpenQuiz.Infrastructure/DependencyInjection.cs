@@ -5,6 +5,7 @@ using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Infrastructure.Auth;
 using OpenQuiz.Infrastructure.Email;
 using OpenQuiz.Infrastructure.Options;
+using OpenQuiz.Infrastructure.Payments;
 using OpenQuiz.Infrastructure.Persistence;
 using OpenQuiz.Infrastructure.Services;
 
@@ -45,6 +46,11 @@ public static class DependencyInjection
         services.AddScoped<IPlanResolver, PlanResolver>();
         services.AddScoped<IEntitlementService, EntitlementService>();
         services.AddScoped<IBillingService, BillingService>();
+        services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IBrandingService, BrandingService>();
+        services.AddSingleton<IPaymentProvider, ManualPaymentProvider>();
+        services.AddSingleton<IPaymentProviderRegistry, PaymentProviderRegistry>();
+        services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
 
         return services;
     }

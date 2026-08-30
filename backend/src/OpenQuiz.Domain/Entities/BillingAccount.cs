@@ -50,4 +50,5 @@ public class BillingAccount
 
     public ICollection<EntitlementOverride> Overrides { get; set; } = new List<EntitlementOverride>();
     public ICollection<UsageCounter> UsageCounters { get; set; } = new List<UsageCounter>();
+    public ICollection<PaymentTransaction> PaymentTransactions { get; set; } = new List<PaymentTransaction>();
 }

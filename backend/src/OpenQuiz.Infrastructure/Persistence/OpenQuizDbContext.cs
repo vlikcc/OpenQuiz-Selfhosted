@@ -23,6 +23,9 @@ public class OpenQuizDbContext : DbContext
     public DbSet<BillingAccount> BillingAccounts => Set<BillingAccount>();
     public DbSet<EntitlementOverride> EntitlementOverrides => Set<EntitlementOverride>();
     public DbSet<UsageCounter> UsageCounters => Set<UsageCounter>();
+    public DbSet<BrandingSettings> BrandingSettings => Set<BrandingSettings>();
+    public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

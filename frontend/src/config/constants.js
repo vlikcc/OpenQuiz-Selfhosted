@@ -1,5 +1,8 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+// Optional; when empty the contact screen still copies a request, it just
+// has no mailto target. Set this in the cloud image, not in self-host defaults.
+export const BILLING_CONTACT_EMAIL = import.meta.env.VITE_BILLING_CONTACT_EMAIL || '';
 
 export const COLORS = ['#4F46E5', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#3B82F6'];
 

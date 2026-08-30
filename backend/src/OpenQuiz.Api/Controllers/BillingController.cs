@@ -29,4 +29,17 @@ public class BillingController : ControllerBase
         await _billing.SetAccountPlanAsync(userId, req.PlanCode, ct);
         return NoContent();
     }
+
+    [Authorize]
+    [HttpPost("checkout")]
+    public async Task<ActionResult<CheckoutSessionDto>> Checkout([FromBody] CreateCheckoutApiRequest req, CancellationToken ct)
+        => Ok(await _billing.CreateCheckoutAsync(req, ct));
+
+    [Authorize]
+    [HttpPost("cancel")]
+    public async Task<IActionResult> Cancel([FromBody] CancelSubscriptionRequest req, CancellationToken ct)
+    {
+        await _billing.CancelMineAsync(req, ct);
+        return NoContent();
+    }
 }

@@ -4,24 +4,23 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Respon
 import { voteService } from '../services/voteService';
 import { scoreService } from '../services/scoreService';
 import { wordcloudService } from '../services/wordcloudService';
+import { pollService } from '../services/pollService';
 import { CONTENT_TYPES, POLL_TYPE_KEY, QUESTION_TYPE_KEY } from '../config/constants';
+import { EntitlementKeys } from '../config/entitlementKeys';
 import { useTranslation } from 'react-i18next';
 import OpenAnswerList from './OpenAnswerList';
 import Leaderboard from './Leaderboard';
+import Gate from './Gate';
+import { mapPollReport } from '../utils/pollReport';
 
 const WordCloudCanvas = lazy(() => import('./wordcloud/WordCloudCanvas'));
 
 const CHART_COLORS = ['#6366F1', '#EC4899', '#10B981', '#F59E0B', '#8B5CF6', '#3B82F6', '#EF4444', '#14B8A6'];
 
-function optionText(question, index) {
-  return question?.options?.[index]?.text ?? `#${index + 1}`;
-}
-
 export default function ResultsAnalysis({ poll, pollId, onClose }) {
   const { t } = useTranslation();
   const [aggregates, setAggregates] = useState([]);
   const [openAnswers, setOpenAnswers] = useState([]);
-  const [votes, setVotes] = useState([]);
   const [clouds, setClouds] = useState([]);
   const [scores, setScores] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
@@ -33,7 +32,6 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
     let current = true;
     voteService.aggregates(pollId).then((rows) => { if (current) setAggregates(rows); }).catch(() => {});
     voteService.allOpen(pollId).then((rows) => { if (current) setOpenAnswers(rows); }).catch(() => {});
-    voteService.allVotes(pollId).then((rows) => { if (current) setVotes(rows); }).catch(() => {});
     scoreService.leaderboard(pollId).then((rows) => { if (current) setScores(rows); }).catch(() => {});
 
     const cloudQuestions = (poll.questions || [])
@@ -56,11 +54,6 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
 
   const typeKey = poll ? POLL_TYPE_KEY[poll.type] : null;
   const typeConfig = typeKey ? CONTENT_TYPES[typeKey] : CONTENT_TYPES.contest;
-
-  const questionsById = useMemo(
-    () => Object.fromEntries((poll?.questions || []).map((q) => [q.id, q])),
-    [poll],
-  );
 
   const analytics = useMemo(() => {
     if (!poll) return null;
@@ -119,39 +112,41 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
     notMultipleChoice: t('results.notMultipleChoice'),
   };
 
-  const extras = useMemo(() => ({
-    questions: analytics?.questionAnalysis ?? [],
-    openAnswers: openAnswers.map((a) => ({
-      question: questionsById[a.questionId]?.text || a.questionId,
-      userName: a.userName,
-      answerText: a.answerText,
-      score: a.score,
-    })),
-    wordClouds: clouds,
-    votes: votes.map((v) => ({
-      userName: v.userName,
-      question: questionsById[v.questionId]?.text || v.questionId,
-      selections: (v.selectedIndices || []).map((i) => optionText(questionsById[v.questionId], i)),
-      isCorrect: v.isCorrect,
-      responseTimeMs: v.responseTimeMs,
-    })),
-  }), [analytics, openAnswers, clouds, votes, questionsById]);
-
   const exportReport = async () => import('../utils/scoreReport');
 
+  const loadGatedReport = async () => {
+    const report = await pollService.report(pollId);
+    return mapPollReport(report, poll);
+  };
+
   const handleExportPdf = async () => {
-    const { buildScoreReportPdf, saveScoreReportPdf } = await exportReport();
-    saveScoreReportPdf(buildScoreReportPdf(poll.title, scores, reportLabels, extras), poll.title);
+    try {
+      const { scores: rows, extras: gated } = await loadGatedReport();
+      const { buildScoreReportPdf, saveScoreReportPdf } = await exportReport();
+      saveScoreReportPdf(buildScoreReportPdf(poll.title, rows, reportLabels, gated), poll.title);
+    } catch {
+      // 402 is raised as the upgrade modal by apiClient.
+    }
   };
 
   const handleExportExcel = async () => {
-    const { buildScoreReportWorkbook, saveScoreReportWorkbook } = await exportReport();
-    saveScoreReportWorkbook(buildScoreReportWorkbook(scores, reportLabels, extras), poll.title);
+    try {
+      const { scores: rows, extras: gated } = await loadGatedReport();
+      const { buildScoreReportWorkbook, saveScoreReportWorkbook } = await exportReport();
+      saveScoreReportWorkbook(buildScoreReportWorkbook(rows, reportLabels, gated), poll.title);
+    } catch {
+      // 402 is raised as the upgrade modal by apiClient.
+    }
   };
 
   const handleExportCsv = async () => {
-    const { buildScoreReportCsv, saveScoreReportCsv } = await exportReport();
-    saveScoreReportCsv(buildScoreReportCsv(scores, reportLabels, extras), poll.title);
+    try {
+      const { scores: rows, extras: gated } = await loadGatedReport();
+      const { buildScoreReportCsv, saveScoreReportCsv } = await exportReport();
+      saveScoreReportCsv(buildScoreReportCsv(rows, reportLabels, gated), poll.title);
+    } catch {
+      // 402 is raised as the upgrade modal by apiClient.
+    }
   };
 
   if (!poll) return null;
@@ -165,9 +160,11 @@ export default function ResultsAnalysis({ poll, pollId, onClose }) {
       <header className="bg-slate-900 text-white p-4 flex items-center justify-between sticky top-0 z-10">
         <h2 className="font-bold text-lg">📊 {t('results.title', { title: poll.title })}</h2>
         <div className="flex gap-2 flex-wrap justify-end">
-          <button onClick={handleExportCsv} className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm flex items-center gap-1"><Download size={16} /> CSV</button>
-          <button onClick={handleExportExcel} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm flex items-center gap-1"><FileSpreadsheet size={16} /> Excel</button>
-          <button onClick={handleExportPdf} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-sm flex items-center gap-1"><FileText size={16} /> PDF</button>
+          <Gate feature={EntitlementKeys.ReportsExport}>
+            <button onClick={handleExportCsv} className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm flex items-center gap-1"><Download size={16} /> CSV</button>
+            <button onClick={handleExportExcel} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm flex items-center gap-1"><FileSpreadsheet size={16} /> Excel</button>
+            <button onClick={handleExportPdf} className="px-3 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg text-sm flex items-center gap-1"><FileText size={16} /> PDF</button>
+          </Gate>
           <button onClick={onClose} className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm">{t('common.close')}</button>
         </div>
       </header>

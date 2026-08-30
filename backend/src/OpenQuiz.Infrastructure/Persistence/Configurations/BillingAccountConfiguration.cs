@@ -38,5 +38,10 @@ public class BillingAccountConfiguration : IEntityTypeConfiguration<BillingAccou
             .WithOne(x => x.BillingAccount)
             .HasForeignKey(x => x.BillingAccountId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        b.HasMany(x => x.PaymentTransactions)
+            .WithOne(x => x.BillingAccount)
+            .HasForeignKey(x => x.BillingAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

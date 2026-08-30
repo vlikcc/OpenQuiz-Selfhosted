@@ -69,6 +69,7 @@ services:
       Billing__LegacyCutoffUtc: ${BILLING_LEGACY_CUTOFF:-}
       Billing__Currency: ${BILLING_CURRENCY:-TRY}
       Billing__WebhookSecret: ${BILLING_WEBHOOK_SECRET:-}
+      Billing__CheckoutReturnUrl: ${BILLING_CHECKOUT_RETURN_URL:-}
     ports:
       - "${API_PORT:-5080}:8080"
     volumes:
@@ -85,6 +86,7 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL-}
         VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+        VITE_BILLING_CONTACT_EMAIL: ${VITE_BILLING_CONTACT_EMAIL-}
     restart: unless-stopped
     depends_on:
       api:

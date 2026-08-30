@@ -6,6 +6,7 @@ import { voteService } from '../services/voteService';
 import { wordcloudService } from '../services/wordcloudService';
 import { reactionService } from '../services/reactionService';
 import { realtimeService } from '../services/realtimeService';
+import { brandingService } from '../services/brandingService';
 import { useTranslation } from 'react-i18next';
 import KatexText from './KatexText';
 import WaitingRoom from './WaitingRoom';
@@ -25,6 +26,7 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
   const [openAnswer, setOpenAnswer] = useState('');
   const [selectedIndices, setSelectedIndices] = useState([]);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [branding, setBranding] = useState(null);
   // The server decides when a question closes; this only tracks how far the
   // local clock is from the server's so the countdown agrees with that decision.
   const [clockOffset, setClockOffset] = useState(0);
@@ -54,6 +56,10 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
         goToQuestion(p.currentQuestionIndex ?? 0);
       }
     }).catch(console.error);
+
+    brandingService.getForPoll(pollId).then((row) => {
+      if (active) setBranding(row);
+    }).catch(() => {});
 
     const unsubP = realtimeService.subscribe(pollId, {
       onPollUpdated: (p) => {
@@ -218,7 +224,7 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
 
   const statusKey = POLL_STATUS_KEY[poll.status] || 'live';
   if (step === 'vote' && statusKey === 'waiting') {
-    return <WaitingRoom poll={poll} participantCount={poll.participantCount || 0} userName={userName} />;
+    return <WaitingRoom poll={poll} participantCount={poll.participantCount || 0} userName={userName} branding={branding} />;
   }
 
   if (step === 'name') {
@@ -227,14 +233,22 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white max-w-sm w-full p-8 rounded-3xl shadow-xl text-center">
-          <div className="text-5xl mb-4">{typeCfg.icon}</div>
+          {branding?.logoUrl ? (
+            <img src={branding.logoUrl} alt="" className="h-16 w-16 object-contain mx-auto mb-4" />
+          ) : (
+            <div className="text-5xl mb-4">{typeCfg.icon}</div>
+          )}
           <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-4 ${typeCfg.classes.badge}`}>{ct(typeKey)}</span>
           <h2 className="text-2xl font-bold mb-2">{poll.title}</h2>
+          {branding?.joinMessage && <p className="text-slate-500 text-sm mb-4">{branding.joinMessage}</p>}
           <p className="text-slate-500 text-sm mb-6">{poll.questions?.length || 0} {t('common.question')}</p>
           <form onSubmit={handleStart}>
             <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl mb-4 text-center font-bold text-lg focus:border-indigo-500 outline-none" placeholder={t('voter.yourName')} required />
             <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg">{t('voter.join')}</button>
           </form>
+          {!branding?.hideOpenQuizBranding && (
+            <p className="mt-6 text-xs text-slate-400">{t('waiting.poweredBy')}</p>
+          )}
         </div>
       </div>
     );

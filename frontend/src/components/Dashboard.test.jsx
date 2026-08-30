@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import { pollService } from '../services/pollService';
 import { POLL_TYPE_VALUE } from '../config/constants';
+import { EntitlementKeys } from '../config/entitlementKeys';
 
 vi.mock('../services/pollService', () => ({
   pollService: { list: vi.fn(), get: vi.fn(), remove: vi.fn(), duplicate: vi.fn() },
@@ -127,6 +128,26 @@ describe('copying a poll', () => {
     await screen.findByText('Yarışma 1');
 
     expect(screen.queryByRole('button', { name: 'Kopyasını oluştur' })).not.toBeInTheDocument();
+  });
+});
+
+describe('content-type gates', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('locks exam create when the plan does not include it', async () => {
+    const user = userEvent.setup();
+    const setComposer = vi.fn();
+    pollService.list.mockResolvedValue(page([], false));
+
+    renderDashboard({
+      can: (key) => key !== EntitlementKeys.ContentExam,
+      setComposer,
+    });
+
+    await user.click(await screen.findByRole('button', { name: /Sınav/ }));
+
+    expect(setComposer).not.toHaveBeenCalled();
+    expect(screen.getByText(/Sınav modu mevcut planınızda yok/)).toBeInTheDocument();
   });
 });
 

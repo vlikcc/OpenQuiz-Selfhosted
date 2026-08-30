@@ -95,6 +95,48 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                     b.ToTable("BillingAccounts", (string)null);
                 });
 
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.BrandingSettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccentColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("HideOpenQuizBranding")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("JoinMessage")
+                        .HasMaxLength(280)
+                        .HasColumnType("nvarchar(280)");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("PrimaryColor")
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId")
+                        .IsUnique();
+
+                    b.ToTable("BrandingSettings", (string)null);
+                });
+
             modelBuilder.Entity("OpenQuiz.Domain.Entities.EntitlementOverride", b =>
                 {
                     b.Property<Guid>("Id")
@@ -230,6 +272,54 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                     b.ToTable("PasswordResetTokens", (string)null);
                 });
 
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("BillingAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("nvarchar(3)");
+
+                    b.Property<string>("InvoiceNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("ProviderPaymentId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BillingAccountId");
+
+                    b.HasIndex("ProviderPaymentId")
+                        .IsUnique()
+                        .HasFilter("[ProviderPaymentId] IS NOT NULL");
+
+                    b.ToTable("PaymentTransactions", (string)null);
+                });
+
             modelBuilder.Entity("OpenQuiz.Domain.Entities.Poll", b =>
                 {
                     b.Property<Guid>("Id")
@@ -283,6 +373,36 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreatorId", "Status");
 
                     b.ToTable("Polls", (string)null);
+                });
+
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.ProcessedWebhookEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "EventId")
+                        .IsUnique();
+
+                    b.ToTable("ProcessedWebhookEvents", (string)null);
                 });
 
             modelBuilder.Entity("OpenQuiz.Domain.Entities.Question", b =>
@@ -643,6 +763,17 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                     b.Navigation("Owner");
                 });
 
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.BrandingSettings", b =>
+                {
+                    b.HasOne("OpenQuiz.Domain.Entities.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
             modelBuilder.Entity("OpenQuiz.Domain.Entities.EntitlementOverride", b =>
                 {
                     b.HasOne("OpenQuiz.Domain.Entities.BillingAccount", "BillingAccount")
@@ -674,6 +805,17 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.HasOne("OpenQuiz.Domain.Entities.BillingAccount", "BillingAccount")
+                        .WithMany("PaymentTransactions")
+                        .HasForeignKey("BillingAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BillingAccount");
                 });
 
             modelBuilder.Entity("OpenQuiz.Domain.Entities.Poll", b =>
@@ -723,6 +865,8 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("OpenQuiz.Domain.Entities.BillingAccount", b =>
                 {
                     b.Navigation("Overrides");
+
+                    b.Navigation("PaymentTransactions");
 
                     b.Navigation("UsageCounters");
                 });

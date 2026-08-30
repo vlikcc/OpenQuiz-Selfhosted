@@ -58,6 +58,10 @@ public sealed class OpenQuizApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IRealtimeNotifier>();
             services.AddSingleton<IRealtimeNotifier>(Realtime);
+
+            // Webhook tests post at /api/billing/webhooks/test. Production
+            // never registers this key — the host under test is the exception.
+            services.AddSingleton<IPaymentProvider, TestPaymentProvider>();
         });
     }
 }

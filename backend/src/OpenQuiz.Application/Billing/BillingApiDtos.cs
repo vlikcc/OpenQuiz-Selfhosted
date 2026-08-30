@@ -23,3 +23,9 @@ public record BillingMeDto(
     IReadOnlyDictionary<string, long> Usage);
 
 public record SetAccountPlanRequest(string PlanCode);
+
+public record CreateCheckoutApiRequest(string PlanCode, string Interval);
+
+public record CheckoutSessionDto(string Url, string? ProviderSessionId);
+
+public record CancelSubscriptionRequest(bool AtPeriodEnd);

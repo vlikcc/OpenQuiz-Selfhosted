@@ -1,8 +1,10 @@
 import { CreditCard } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEntitlements } from '../hooks/useEntitlements';
 import { EntitlementKeys } from '../config/entitlementKeys';
 import { PLAN_LABEL_I18N } from '../config/planLabels';
+import { entitlementService } from '../services/entitlementService';
 
 function UsageBar({ used, limit, label, t }) {
   const isUnlimited = limit === EntitlementKeys.Unlimited;
@@ -22,9 +24,10 @@ function UsageBar({ used, limit, label, t }) {
   );
 }
 
-export default function BillingSection() {
+export default function BillingSection({ showToast }) {
   const { t } = useTranslation();
-  const { entitlements, plan, usage, loading } = useEntitlements();
+  const { entitlements, plan, usage, loading, refresh } = useEntitlements();
+  const [busy, setBusy] = useState(false);
 
   if (loading && !entitlements) return null;
   if (!entitlements) return null;
@@ -53,6 +56,47 @@ export default function BillingSection() {
       </div>
 
       <p className="text-xs text-slate-400">{t('billing.manageHint')}</p>
+      {plan === 'free' && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const session = await entitlementService.checkout('pro');
+              if (session?.url) window.location.assign(session.url);
+            } catch (err) {
+              if (!err?.planLimit) showToast?.(err.message, 'error');
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg text-sm font-bold"
+        >
+          {t('billing.requestUpgrade')}
+        </button>
+      )}
+      {(plan === 'pro' || plan === 'team') && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await entitlementService.cancel(true);
+              await refresh();
+              showToast?.(t('billing.cancelRequested'));
+            } catch (err) {
+              showToast?.(err.message, 'error');
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="w-full py-2 bg-slate-100 hover:bg-slate-200 disabled:bg-slate-50 text-slate-700 rounded-lg text-sm font-bold"
+        >
+          {t('billing.cancelAtPeriodEnd')}
+        </button>
+      )}
     </div>
   );
 }

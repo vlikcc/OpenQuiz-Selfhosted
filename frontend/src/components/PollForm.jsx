@@ -1,8 +1,10 @@
 import { Suspense, lazy, useState } from 'react';
-import { Plus, Trash2, XCircle, Upload, BookOpen, Image as ImageIcon, Timer } from 'lucide-react';
+import { Plus, Trash2, XCircle, Upload, BookOpen, Image as ImageIcon, Timer, Lock } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_VALUE, QUESTION_TYPE_VALUE, QUESTION_TYPE_KEY } from '../config/constants';
+import { EntitlementKeys } from '../config/entitlementKeys';
 import { pollService } from '../services/pollService';
 import { useTranslation } from 'react-i18next';
+import { useEntitlements } from '../hooks/useEntitlements';
 import KatexText, { KatexTextEditor } from './KatexText';
 import { KATEX_EXAMPLES } from '../config/katexExamples';
 import { DEFAULT_MODERATION, parseModeration, toWordCloudConfig } from '../utils/wordCloudSettings';
@@ -10,6 +12,16 @@ import WordCloudModeration from './wordcloud/WordCloudModeration';
 
 // Carries the spreadsheet and Word parsers, and most polls are typed by hand.
 const FileImport = lazy(() => import('./FileImport'));
+
+const GATED_CONTENT_TYPES = {
+  exam: EntitlementKeys.ContentExam,
+  wordcloud: EntitlementKeys.ContentWordCloud,
+};
+
+const FEATURE_LOCKED_I18N = {
+  [EntitlementKeys.ContentExam]: 'billing.featureLockedContentExam',
+  [EntitlementKeys.ContentWordCloud]: 'billing.featureLockedContentWordcloud',
+};
 
 const blankMultiple = () => ({ text: '', options: ['', ''], correctIndex: 0, questionType: 'multiple', correctAnswer: '', image: '', timeLimit: 30 });
 const blankOpen = () => ({ text: '', questionType: 'open', correctAnswer: '', points: 10, image: '', timeLimit: 30 });
@@ -51,6 +63,7 @@ const draftFromPoll = (poll) => {
  */
 export default function PollForm({ contentType, poll = null, showToast, onCancel, onSaved }) {
   const { t } = useTranslation();
+  const { can } = useEntitlements();
   const [quizTitle, setQuizTitle] = useState(poll?.title ?? '');
   const [questions, setQuestions] = useState(() => (poll ? draftFromPoll(poll) : [blankFor(contentType)]));
   const [showKatexHelp, setShowKatexHelp] = useState(false);
@@ -59,6 +72,22 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
 
   const typeConfig = CONTENT_TYPES[contentType];
   const ct = (key) => t(`contentTypes.${key}.label`);
+  const featureKey = GATED_CONTENT_TYPES[contentType];
+
+  if (!poll && featureKey && !can(featureKey)) {
+    return (
+      <div className="bg-white p-8 rounded-2xl shadow-xl border border-indigo-50 max-w-lg mx-auto text-center">
+        <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Lock size={26} className="text-amber-600" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-800 mb-2">{t('billing.featureLockedTitle')}</h2>
+        <p className="text-slate-500 mb-6">{t(FEATURE_LOCKED_I18N[featureKey])}</p>
+        <button type="button" onClick={onCancel} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold">
+          {t('common.close')}
+        </button>
+      </div>
+    );
+  }
 
   const handleImportQuestions = (importedQuestions) => {
     setQuestions(importedQuestions.map((q) => ({

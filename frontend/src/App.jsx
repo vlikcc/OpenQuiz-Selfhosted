@@ -20,11 +20,14 @@ import LoadingPanel from './components/LoadingPanel';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
 import UpgradeModal from './components/UpgradeModal';
 import { isPasswordResetPath, resetTokenFromSearch } from './utils/resetRoute';
+import { isBillingContactSearch, planFromSearch } from './utils/billingRoute';
 
 // The presenter pulls in the charting stack and the admin panel is reachable by
 // a handful of accounts, so neither belongs in the bundle every voter downloads.
 const PresenterMode = lazy(() => import('./components/PresenterMode'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const PricingScreen = lazy(() => import('./components/PricingScreen'));
+const BillingContactScreen = lazy(() => import('./components/BillingContactScreen'));
 
 const urlParams = new URLSearchParams(window.location.search);
 const isVoterMode = urlParams.get('mode') === 'voter' && !!urlParams.get('id');
@@ -96,9 +99,14 @@ export default function App() {
   // composed: { contentType, pollId } with a null pollId for a new one.
   const [composer, setComposer] = useState(null);
   const [showLandingPage, setShowLandingPage] = useState(true);
+  const [showPricing, setShowPricing] = useState(false);
   // The reset e-mail lands on this same SPA; once the form is done we drop
   // the path so the next render is the ordinary landing / sign-in screen.
   const [leaveReset, setLeaveReset] = useState(false);
+  // Manual checkout lands on `?billing=contact`; once the user leaves we
+  // strip the query so a later dashboard render is not trapped here.
+  const [leaveBillingContact, setLeaveBillingContact] = useState(false);
+  const [billingContactAuth, setBillingContactAuth] = useState(false);
 
   // QR voter preload
   useEffect(() => {
@@ -213,7 +221,58 @@ export default function App() {
 
   if (authLoading) return <LoadingScreen />;
 
+  if (isBillingContactSearch(window.location.search) && !leaveBillingContact) {
+    const dismissBillingContact = () => {
+      window.history.replaceState({}, '', window.location.pathname || '/');
+      setLeaveBillingContact(true);
+      setBillingContactAuth(false);
+    };
+
+    if (billingContactAuth && !user) {
+      return (
+        <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
+          <AuthScreen
+            onGoogleLogin={handleGoogleLogin}
+            onEmailLogin={handleEmailLogin}
+            onEmailRegister={handleEmailRegister}
+            onPasswordReset={handlePasswordReset}
+            isLoading={false}
+            onBack={() => setBillingContactAuth(false)}
+          />
+        </ErrorBoundary>
+      );
+    }
+
+    return (
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
+        <Suspense fallback={<LoadingPanel dark />}>
+          <BillingContactScreen
+            planCode={planFromSearch(window.location.search)}
+            user={user}
+            onBack={dismissBillingContact}
+            onLogin={() => {
+              setBillingContactAuth(true);
+              setShowLandingPage(false);
+            }}
+          />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
   if (!user) {
+    if (showPricing) {
+      return (
+        <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
+          <Suspense fallback={<LoadingPanel dark />}>
+            <PricingScreen
+              onBack={() => setShowPricing(false)}
+              onLogin={() => { setShowPricing(false); setShowLandingPage(false); }}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      );
+    }
     if (!showLandingPage) {
       return (
         <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
@@ -230,7 +289,10 @@ export default function App() {
     }
     return (
       <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
-        <LandingPage onLogin={() => setShowLandingPage(false)} />
+        <LandingPage
+          onLogin={() => setShowLandingPage(false)}
+          onPricing={() => setShowPricing(true)}
+        />
       </ErrorBoundary>
     );
   }
@@ -316,6 +378,7 @@ export default function App() {
               isAdmin={isAdmin}
               onLogout={handleLogout}
               onNavigateToAdmin={() => setActiveScreen('admin')}
+              showToast={showToast}
             />
           )}
         </div>

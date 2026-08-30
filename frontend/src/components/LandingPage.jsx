@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const LandingPage = ({ onLogin }) => {
+const LandingPage = ({ onLogin, onPricing }) => {
   const { t } = useTranslation();
 
   const features = [
@@ -55,7 +55,7 @@ const LandingPage = ({ onLogin }) => {
     { icon: Globe, text: t("landing.highlightSync") },
     { icon: Lock, text: t("landing.highlightSecurity") },
     { icon: PieChart, text: t("landing.highlightAnalysis") },
-    { icon: Users, text: t("landing.highlightUnlimited") }
+    { icon: Users, text: t("landing.highlightLive") }
   ];
 
   return (
@@ -80,14 +80,25 @@ const LandingPage = ({ onLogin }) => {
                 </span>
               </div>
 
-              <button
-                onClick={onLogin}
-                className="group px-4 sm:px-6 py-2.5 bg-white text-slate-900 rounded-full font-bold text-sm hover:bg-indigo-100 transition-all shadow-lg shadow-white/20 flex items-center gap-2"
-              >
+              <div className="flex items-center gap-2">
+                {onPricing && (
+                  <button
+                    type="button"
+                    onClick={onPricing}
+                    className="px-4 py-2 text-sm font-bold text-white/80 hover:text-white"
+                  >
+                    {t('landing.pricing')}
+                  </button>
+                )}
+                <button
+                  onClick={onLogin}
+                  className="group px-4 sm:px-6 py-2.5 bg-white text-slate-900 rounded-full font-bold text-sm hover:bg-indigo-100 transition-all shadow-lg shadow-white/20 flex items-center gap-2"
+                >
                 <span className="hidden sm:inline">{t("landing.login")}</span>
                 <span className="sm:hidden">{t("landing.loginShort")}</span>
                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </button>
+              </div>
             </div>
           </div>
         </header>

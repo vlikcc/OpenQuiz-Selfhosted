@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using OpenQuiz.Application.Abstractions;
 using OpenQuiz.Application.Common;
 using OpenQuiz.Application.Polls;
+using OpenQuiz.Application.Reports;
 
 namespace OpenQuiz.Api.Controllers;
 
@@ -13,7 +14,13 @@ namespace OpenQuiz.Api.Controllers;
 public class PollsController : ControllerBase
 {
     private readonly IPollService _polls;
-    public PollsController(IPollService polls) => _polls = polls;
+    private readonly IReportService _reports;
+
+    public PollsController(IPollService polls, IReportService reports)
+    {
+        _polls = polls;
+        _reports = reports;
+    }
 
     [Authorize]
     [HttpGet]
@@ -76,4 +83,13 @@ public class PollsController : ControllerBase
     [HttpPost("{id:guid}/join")]
     public async Task<ActionResult<PollDto>> Join(Guid id, [FromBody] JoinPollRequest req, CancellationToken ct)
         => Ok(await _polls.JoinAsync(id, req, ct));
+
+    /// <summary>
+    /// Owner-only dump the export buttons fetch. Gated on <c>reports.export</c>
+    /// inside the service (ownership first, so a stranger gets 403 not 402).
+    /// </summary>
+    [Authorize]
+    [HttpGet("{id:guid}/report")]
+    public async Task<ActionResult<PollReportDto>> Report(Guid id, CancellationToken ct)
+        => Ok(await _reports.GetAsync(id, ct));
 }
