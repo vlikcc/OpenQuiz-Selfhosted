@@ -329,5 +329,31 @@
       "label": "Word Cloud",
       "description": "Live cloud from participant words"
     }
+  },
+  "billing": {
+    "currentPlan": "Your plan",
+    "planFree": "Free",
+    "planPro": "Pro",
+    "planTeam": "Team",
+    "planSelfHostedPro": "Self-Hosted Pro",
+    "planUnlimited": "Unlimited",
+    "unlimited": "Unlimited",
+    "usageActivePolls": "Active polls",
+    "usageSessionsPerMonth": "Sessions this month",
+    "manageHint": "Contact your administrator to change your plan.",
+    "limitReachedTitle": "Plan limit reached",
+    "featureLockedTitle": "This feature isn't on your plan",
+    "limitReachedActivePolls": "You've reached the number of polls you can run at once.",
+    "limitReachedParticipants": "This session has reached its participant limit.",
+    "limitReachedSessionsPerMonth": "You've used up this month's sessions.",
+    "limitReachedQuestionsPerPoll": "You've reached the question limit for a single poll.",
+    "featureLockedContentExam": "Exam mode isn't included in your current plan.",
+    "featureLockedContentWordcloud": "Word cloud isn't included in your current plan.",
+    "featureLockedContentKatex": "KaTeX formula support isn't included in your current plan.",
+    "featureLockedReportsExport": "Report export isn't included in your current plan.",
+    "featureLockedReportsAdvanced": "Advanced reporting isn't included in your current plan.",
+    "featureLockedBrandingCustom": "Custom branding isn't included in your current plan.",
+    "requiredPlan": "Available on the {{plan}} plan.",
+    "upgradeCta": "Upgrade your plan"
   }
 }

@@ -11,7 +11,7 @@ vi.mock('./services/pollService', () => ({
   pollService: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), join: vi.fn() },
 }));
 vi.mock('./services/authService', () => ({ authService: {} }));
-vi.mock('./services/tokenStore', () => ({ tokenStore: { getAccessToken: () => null } }));
+vi.mock('./services/tokenStore', () => ({ tokenStore: { getAccessToken: () => null, subscribe: () => () => {} } }));
 vi.mock('./services/realtimeService', () => ({
   realtimeService: { subscribe: vi.fn(() => Promise.resolve(() => {})) },
 }));

@@ -1,10 +1,20 @@
 import { Suspense, lazy, useCallback, useState, useEffect } from 'react';
-import { Trash2, Smartphone, Users, AlertTriangle, Copy, CopyPlus, QrCode, Loader2, Edit2, BarChart3 } from 'lucide-react';
+import { Trash2, Smartphone, Users, AlertTriangle, Copy, CopyPlus, QrCode, Loader2, Edit2, BarChart3, Lock, CreditCard } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_KEY } from '../config/constants';
+import { EntitlementKeys } from '../config/entitlementKeys';
+import { PLAN_LABEL_I18N } from '../config/planLabels';
 import { pollService } from '../services/pollService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import LoadingPanel from './LoadingPanel';
+import UpgradeModal from './UpgradeModal';
+
+// Only these two content types are plan-gated today (see EntitlementKeys on
+// the backend) — Contest/Survey/Quiz have no feature key and are always on.
+const GATED_CONTENT_TYPES = {
+  exam: EntitlementKeys.ContentExam,
+  wordcloud: EntitlementKeys.ContentWordCloud,
+};
 
 // The editor reaches the spreadsheet parsers and the KaTeX preview; the poll
 // list itself needs none of that.
@@ -21,6 +31,8 @@ export default function Dashboard({
   isAuthorized,
   composer,
   setComposer,
+  can = () => true,
+  plan = null,
 }) {
   const { t } = useTranslation();
   const [polls, setPolls] = useState([]);
@@ -33,6 +45,10 @@ export default function Dashboard({
   const [editing, setEditing] = useState(null);
   // The report screen needs the questions too: { id, poll } while it loads.
   const [reporting, setReporting] = useState(null);
+  // A locked content type's featureKey, or null. Clicking a locked button
+  // never reaches the server, so this is raised locally rather than through
+  // apiClient's 402 handler.
+  const [upgradePrompt, setUpgradePrompt] = useState(null);
 
   const canCreateQuiz = isAdmin || isAuthorized;
 
@@ -124,6 +140,12 @@ export default function Dashboard({
     <div className="w-full h-full flex flex-col overflow-hidden bg-slate-50">
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 custom-scrollbar">
         {qrPoll && <QrModal pollId={qrPoll.id} title={qrPoll.title} onClose={() => setQrPoll(null)} />}
+        {upgradePrompt && (
+          <UpgradeModal
+            info={{ code: 'plan_feature_required', featureKey: upgradePrompt }}
+            onClose={() => setUpgradePrompt(null)}
+          />
+        )}
 
         {reporting && (
           reporting.poll ? (
@@ -145,15 +167,19 @@ export default function Dashboard({
           </div>
           {!composer && canCreateQuiz && (
             <div className="flex flex-wrap gap-2 sm:gap-3">
-              {Object.entries(CONTENT_TYPES).map(([key, cfg]) => (
-                <button
-                  key={key}
-                  onClick={() => setComposer({ contentType: key, pollId: null })}
-                  className={`${cfg.classes.solid} text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 shadow-lg text-xs sm:text-sm`}
-                >
-                  <span>{cfg.icon}</span> {ct(key)}
-                </button>
-              ))}
+              {Object.entries(CONTENT_TYPES).map(([key, cfg]) => {
+                const featureKey = GATED_CONTENT_TYPES[key];
+                const locked = featureKey && !can(featureKey);
+                return (
+                  <button
+                    key={key}
+                    onClick={() => (locked ? setUpgradePrompt(featureKey) : setComposer({ contentType: key, pollId: null }))}
+                    className={`${locked ? 'bg-slate-100 text-slate-400 hover:bg-slate-200' : `${cfg.classes.solid} text-white`} px-3 sm:px-4 py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 shadow-lg text-xs sm:text-sm`}
+                  >
+                    {locked ? <Lock size={14} /> : <span>{cfg.icon}</span>} {ct(key)}
+                  </button>
+                );
+              })}
             </div>
           )}
           {!canCreateQuiz && (
@@ -162,6 +188,12 @@ export default function Dashboard({
             </div>
           )}
         </header>
+
+        {!composer && canCreateQuiz && plan && plan !== 'unlimited' && (
+          <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2 mb-6 w-fit">
+            <CreditCard size={16} /> {t('billing.currentPlan')}: {t(PLAN_LABEL_I18N[plan] || plan)}
+          </div>
+        )}
 
         {composer ? (
           composer.pollId && !editingPoll ? (

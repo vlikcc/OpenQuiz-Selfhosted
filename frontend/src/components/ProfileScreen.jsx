@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, LogOut, Shield, ChevronRight, Globe, Info, Bell, Moon, HelpCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import BillingSection from './BillingSection';
 
 const ProfileScreen = ({ user, isAdmin, onLogout, onNavigateToAdmin }) => {
     const { t, i18n } = useTranslation();
@@ -47,6 +48,8 @@ const ProfileScreen = ({ user, isAdmin, onLogout, onNavigateToAdmin }) => {
                         <ChevronRight size={20} className="text-slate-400" />
                     </button>
                 )}
+
+                <BillingSection />
 
                 {/* Language Selector */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">

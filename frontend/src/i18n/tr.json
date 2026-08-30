@@ -329,5 +329,31 @@
       "label": "Kelime Bulutu",
       "description": "Katılımcıların yazdığı kelimelerden anlık bulut"
     }
+  },
+  "billing": {
+    "currentPlan": "Mevcut planınız",
+    "planFree": "Ücretsiz",
+    "planPro": "Pro",
+    "planTeam": "Takım",
+    "planSelfHostedPro": "Kendi Sunucunuzda Pro",
+    "planUnlimited": "Sınırsız",
+    "unlimited": "Sınırsız",
+    "usageActivePolls": "Aktif yarışmalar",
+    "usageSessionsPerMonth": "Bu ay kullanılan oturumlar",
+    "manageHint": "Planınızı değiştirmek için yöneticinizle iletişime geçin.",
+    "limitReachedTitle": "Plan limitine ulaşıldı",
+    "featureLockedTitle": "Bu özellik planınızda yok",
+    "limitReachedActivePolls": "Aynı anda yayınlayabileceğiniz yarışma sayısına ulaştınız.",
+    "limitReachedParticipants": "Bu oturumun katılımcı sınırına ulaşıldı.",
+    "limitReachedSessionsPerMonth": "Bu ayki oturum hakkınızı kullandınız.",
+    "limitReachedQuestionsPerPoll": "Bir yarışmadaki soru sayısı sınırına ulaştınız.",
+    "featureLockedContentExam": "Sınav modu mevcut planınızda yok.",
+    "featureLockedContentWordcloud": "Kelime bulutu mevcut planınızda yok.",
+    "featureLockedContentKatex": "KaTeX formül desteği mevcut planınızda yok.",
+    "featureLockedReportsExport": "Rapor dışa aktarma mevcut planınızda yok.",
+    "featureLockedReportsAdvanced": "Gelişmiş raporlama mevcut planınızda yok.",
+    "featureLockedBrandingCustom": "Marka özelleştirme mevcut planınızda yok.",
+    "requiredPlan": "{{plan}} planında kullanılabilir.",
+    "upgradeCta": "Planınızı yükseltin"
   }
 }

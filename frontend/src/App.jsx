@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next';
 
 import { CONTENT_TYPES, POLL_TYPE_KEY } from './config/constants';
 import { useAuth } from './hooks/useAuth';
+import { useEntitlements } from './hooks/useEntitlements';
 import { authService } from './services/authService';
 import { pollService } from './services/pollService';
 import { tokenStore } from './services/tokenStore';
+import { setPlanLimitHandler } from './services/apiClient';
 
 import VoterMode from './components/VoterMode';
 import Dashboard from './components/Dashboard';
@@ -16,6 +18,7 @@ import ProfileScreen from './components/ProfileScreen';
 import LandingPage from './components/LandingPage';
 import LoadingPanel from './components/LoadingPanel';
 import ResetPasswordScreen from './components/ResetPasswordScreen';
+import UpgradeModal from './components/UpgradeModal';
 import { isPasswordResetPath, resetTokenFromSearch } from './utils/resetRoute';
 
 // The presenter pulls in the charting stack and the admin panel is reachable by
@@ -79,8 +82,12 @@ export default function App() {
   const { user, loading: authLoading, logout } = useAuth();
   const isAdmin = !!user?.isAdmin;
   const isAuthorized = !!user?.canCreate || isAdmin;
+  const { can, plan, refresh: refreshEntitlements } = useEntitlements();
 
   const [preloadedPoll, setPreloadedPoll] = useState(null);
+  // Raised from anywhere a 402 (plan_limit_exceeded / plan_feature_required)
+  // comes back from the API — see the setPlanLimitHandler wiring below.
+  const [upgradeInfo, setUpgradeInfo] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeScreen, setActiveScreen] = useState('tabs');
   const [activePollId, setActivePollId] = useState(() => initialPollId || localStorage.getItem('activePollId'));
@@ -102,6 +109,17 @@ export default function App() {
   useEffect(() => {
     if (activePollId) localStorage.setItem('activePollId', activePollId);
   }, [activePollId]);
+
+  useEffect(() => {
+    setPlanLimitHandler((info) => {
+      setUpgradeInfo(info);
+      // The user may have just been upgraded elsewhere (another tab, an
+      // admin's manual plan change) — re-fetching means the very next
+      // attempt reflects the real, current plan rather than a stale one.
+      refreshEntitlements();
+    });
+    return () => setPlanLimitHandler(null);
+  }, [refreshEntitlements]);
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type });
@@ -188,6 +206,7 @@ export default function App() {
             {toast.message}
           </div>
         )}
+        {upgradeInfo && <UpgradeModal info={upgradeInfo} onClose={() => setUpgradeInfo(null)} />}
       </ErrorBoundary>
     );
   }
@@ -234,6 +253,7 @@ export default function App() {
             {toast.message}
           </div>
         )}
+        {upgradeInfo && <UpgradeModal info={upgradeInfo} onClose={() => setUpgradeInfo(null)} />}
       </ErrorBoundary>
     );
   }
@@ -286,6 +306,8 @@ export default function App() {
               isAuthorized={isAuthorized}
               composer={composer}
               setComposer={setComposer}
+              can={can}
+              plan={plan}
             />
           )}
           {activeTab === 'profile' && (
@@ -299,6 +321,7 @@ export default function App() {
         </div>
 
         <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+        {upgradeInfo && <UpgradeModal info={upgradeInfo} onClose={() => setUpgradeInfo(null)} />}
       </div>
     </ErrorBoundary>
   );

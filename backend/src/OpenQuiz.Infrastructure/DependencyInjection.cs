@@ -18,6 +18,7 @@ public static class DependencyInjection
         services.Configure<GoogleAuthOptions>(config.GetSection(GoogleAuthOptions.SectionName));
         services.Configure<SmtpOptions>(config.GetSection(SmtpOptions.SectionName));
         services.Configure<AppOptions>(config.GetSection(AppOptions.SectionName));
+        services.Configure<BillingOptions>(config.GetSection(BillingOptions.SectionName));
 
         var connectionString = config.GetConnectionString("Default")
             ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
@@ -25,6 +26,10 @@ public static class DependencyInjection
         services.AddDbContext<OpenQuizDbContext>(opt =>
             opt.UseSqlServer(connectionString, sql =>
                 sql.MigrationsAssembly(typeof(OpenQuizDbContext).Assembly.FullName)));
+
+        // The entitlement engine caches resolved plans for a short TTL
+        // (EntitlementService) — not registered anywhere else in this project.
+        services.AddMemoryCache();
 
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
@@ -37,6 +42,9 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IWordCloudService, WordCloudService>();
         services.AddScoped<IReactionService, ReactionService>();
+        services.AddScoped<IPlanResolver, PlanResolver>();
+        services.AddScoped<IEntitlementService, EntitlementService>();
+        services.AddScoped<IBillingService, BillingService>();
 
         return services;
     }

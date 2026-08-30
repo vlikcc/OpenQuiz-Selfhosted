@@ -4,6 +4,14 @@ import { tokenStore } from './tokenStore';
 const NO_BODY = Symbol('no-body');
 let refreshPromise = null;
 
+// Module-level, not React state, so this fetch wrapper stays framework-free —
+// the same trick tokenStore.js uses for its pub/sub. App.jsx wires this to
+// raise the upgrade modal from wherever a 402 happens to originate.
+let planLimitHandler = null;
+export function setPlanLimitHandler(fn) {
+  planLimitHandler = fn;
+}
+
 async function attemptRefresh() {
   const refreshToken = tokenStore.getRefreshToken();
   if (!refreshToken) return null;
@@ -59,6 +67,23 @@ async function request(method, path, body = NO_BODY, { auth = true } = {}) {
     const error = new Error(message);
     error.status = res.status;
     error.problem = err;
+
+    // 402 carries a machine-readable discriminator in the ProblemDetails body
+    // (plan_limit_exceeded / plan_feature_required — see Errors.cs on the
+    // backend) so the frontend can raise an upgrade prompt instead of a bare
+    // error toast, without parsing the human-readable message.
+    if (res.status === 402) {
+      error.planLimit = {
+        code: err?.title,
+        limitKey: err?.limitKey,
+        featureKey: err?.featureKey,
+        limit: err?.limit,
+        attempted: err?.attempted,
+        requiredPlan: err?.requiredPlan,
+      };
+      planLimitHandler?.(error.planLimit);
+    }
+
     throw error;
   }
 

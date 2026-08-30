@@ -44,3 +44,5 @@ appsettings.Local.json
 
 # Docker
 *.tar
+
+.dfmt/

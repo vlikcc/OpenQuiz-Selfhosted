@@ -20,6 +20,9 @@ public class OpenQuizDbContext : DbContext
     public DbSet<Score> Scores => Set<Score>();
     public DbSet<Reaction> Reactions => Set<Reaction>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<BillingAccount> BillingAccounts => Set<BillingAccount>();
+    public DbSet<EntitlementOverride> EntitlementOverrides => Set<EntitlementOverride>();
+    public DbSet<UsageCounter> UsageCounters => Set<UsageCounter>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

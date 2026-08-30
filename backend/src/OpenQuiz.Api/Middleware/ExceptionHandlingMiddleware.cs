@@ -28,7 +28,7 @@ public class ExceptionHandlingMiddleware
         }
         catch (AppException aex)
         {
-            await WriteAsync(ctx, aex.StatusCode, aex.ErrorCode, aex.Message);
+            await WriteAsync(ctx, aex.StatusCode, aex.ErrorCode, aex.Message, extensions: aex.Extensions);
         }
         catch (Exception ex)
         {
@@ -37,7 +37,13 @@ public class ExceptionHandlingMiddleware
         }
     }
 
-    private static async Task WriteAsync(HttpContext ctx, int status, string code, string message, object? details = null)
+    private static async Task WriteAsync(
+        HttpContext ctx,
+        int status,
+        string code,
+        string message,
+        object? details = null,
+        IReadOnlyDictionary<string, object?>? extensions = null)
     {
         ctx.Response.StatusCode = status;
         ctx.Response.ContentType = "application/problem+json";
@@ -50,6 +56,11 @@ public class ExceptionHandlingMiddleware
             Detail = message
         };
         if (details is not null) problem.Extensions["errors"] = details;
+        if (extensions is not null)
+        {
+            foreach (var (key, value) in extensions)
+                problem.Extensions[key] = value;
+        }
 
         await ctx.Response.WriteAsync(JsonSerializer.Serialize(problem));
     }

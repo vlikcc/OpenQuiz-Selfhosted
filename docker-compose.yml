@@ -1,6 +1,9 @@
 services:
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    # Official SQL Server images are amd64-only. Required on Apple Silicon;
+    # a no-op on x86_64 hosts.
+    platform: linux/amd64
     restart: unless-stopped
     # No `user:` override here on purpose. The 2022 image already runs sqlservr
     # as the mssql account, and pinning a different uid/gid stops it creating
@@ -59,6 +62,13 @@ services:
       Realtime__RedisConnectionString: ${REDIS_CONNECTION_STRING:-}
       Observability__PrometheusEnabled: ${PROMETHEUS_ENABLED:-false}
       Observability__OtlpEndpoint: ${OTLP_ENDPOINT:-}
+      Billing__Enabled: ${BILLING_ENABLED:-false}
+      Billing__Provider: ${BILLING_PROVIDER:-manual}
+      Billing__DefaultPlanCode: ${BILLING_DEFAULT_PLAN:-unlimited}
+      Billing__LegacyPlanCode: ${BILLING_LEGACY_PLAN:-}
+      Billing__LegacyCutoffUtc: ${BILLING_LEGACY_CUTOFF:-}
+      Billing__Currency: ${BILLING_CURRENCY:-TRY}
+      Billing__WebhookSecret: ${BILLING_WEBHOOK_SECRET:-}
     ports:
       - "${API_PORT:-5080}:8080"
     volumes:

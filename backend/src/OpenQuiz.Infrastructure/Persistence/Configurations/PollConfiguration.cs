@@ -17,6 +17,9 @@ public class PollConfiguration : IEntityTypeConfiguration<Poll>
 
         b.HasIndex(x => x.CreatorId);
         b.HasIndex(x => x.CreatedAt);
+        // Active-poll caps count a creator's Live polls, so the pair
+        // is queried together whenever a plan limit is checked.
+        b.HasIndex(x => new { x.CreatorId, x.Status });
 
         b.HasMany(x => x.Questions)
             .WithOne(x => x.Poll)

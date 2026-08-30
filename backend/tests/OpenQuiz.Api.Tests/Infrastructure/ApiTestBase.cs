@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using OpenQuiz.Application.Auth;
 using OpenQuiz.Application.Polls;
+using OpenQuiz.Domain.Entities;
 using OpenQuiz.Domain.Enums;
 using OpenQuiz.Infrastructure.Persistence;
 
@@ -79,6 +80,34 @@ public abstract class ApiTestBase : IAsyncLifetime
         var response = await Anonymous.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, ValidPassword), Json);
         response.EnsureSuccessStatusCode();
         return await ReadAsync<AuthResponse>(response);
+    }
+
+    /// <summary>
+    /// A registered, creator-authorized account whose <c>BillingAccount</c> is
+    /// pinned to <paramref name="planCode"/> directly in the database — no
+    /// re-login, unlike <see cref="RegisterCreatorAsync"/>. That is the point:
+    /// plan enforcement reads the database on every request rather than a JWT
+    /// claim (see <c>EntitlementService</c>), so a plan change must take effect
+    /// on the caller's very next request.
+    /// </summary>
+    protected async Task<AuthResponse> RegisterOnPlanAsync(string planCode, string? email = null)
+    {
+        var auth = await RegisterCreatorAsync(email);
+
+        await using (var db = CreateDbContext())
+        {
+            db.BillingAccounts.Add(new BillingAccount
+            {
+                OwnerUserId = auth.User.Id,
+                PlanCode = planCode,
+                Source = PlanSource.Manual,
+                Status = SubscriptionStatus.Active,
+                CreatedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        return auth;
     }
 
     protected HttpClient ClientFor(AuthResponse auth)
