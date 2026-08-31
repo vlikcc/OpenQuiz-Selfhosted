@@ -39,12 +39,16 @@ async function attemptRefresh() {
   return refreshPromise;
 }
 
-async function request(method, path, body = NO_BODY, { auth = true } = {}) {
+async function request(method, path, body = NO_BODY, { auth = true, form = false } = {}) {
   const headers = { Accept: 'application/json' };
   let payload;
   if (body !== NO_BODY) {
-    headers['Content-Type'] = 'application/json';
-    payload = JSON.stringify(body);
+    if (form) {
+      payload = body;
+    } else {
+      headers['Content-Type'] = 'application/json';
+      payload = JSON.stringify(body);
+    }
   }
 
   let token = auth ? tokenStore.getAccessToken() : null;
@@ -97,4 +101,6 @@ export const api = {
   post: (path, body, opts) => request('POST', path, body ?? {}, opts),
   put: (path, body, opts) => request('PUT', path, body ?? {}, opts),
   delete: (path, opts) => request('DELETE', path, NO_BODY, opts),
+  // Browser sets the multipart boundary; do not assign Content-Type here.
+  postForm: (path, formData, opts) => request('POST', path, formData, { ...opts, form: true }),
 };

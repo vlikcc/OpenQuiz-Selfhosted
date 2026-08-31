@@ -22,4 +22,11 @@ i18n
     },
   });
 
+const applyDocumentLang = (lng) => {
+  const short = (lng || 'tr').slice(0, 2);
+  document.documentElement.lang = short === 'en' ? 'en' : 'tr';
+};
+applyDocumentLang(i18n.resolvedLanguage || i18n.language);
+i18n.on('languageChanged', applyDocumentLang);
+
 export default i18n;

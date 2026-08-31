@@ -73,3 +73,8 @@ public class JoinPollValidator : AbstractValidator<JoinPollRequest>
 {
     public JoinPollValidator() => RuleFor(x => x.UserName).NotEmpty().MaximumLength(128);
 }
+
+public class AddCollaboratorValidator : AbstractValidator<AddCollaboratorRequest>
+{
+    public AddCollaboratorValidator() => RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(256);
+}

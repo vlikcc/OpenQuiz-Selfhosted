@@ -175,6 +175,43 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                     b.ToTable("EntitlementOverrides", (string)null);
                 });
 
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.MediaFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<long>("ByteSize")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Extension")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.ToTable("MediaFiles", (string)null);
+                });
+
             modelBuilder.Entity("OpenQuiz.Domain.Entities.OpenAnswer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -338,17 +375,31 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("JoinCode")
+                        .HasMaxLength(6)
+                        .HasColumnType("nvarchar(6)");
+
                     b.Property<int>("ParticipantCount")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("QuestionStartedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("ReminderSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ResultsShareToken")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<DateTime?>("ScheduledStartAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<byte>("Status")
                         .HasColumnType("tinyint");
@@ -370,9 +421,44 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CreatorId");
 
+                    b.HasIndex("JoinCode")
+                        .IsUnique()
+                        .HasFilter("[JoinCode] IS NOT NULL");
+
+                    b.HasIndex("ResultsShareToken")
+                        .IsUnique()
+                        .HasFilter("[ResultsShareToken] IS NOT NULL");
+
                     b.HasIndex("CreatorId", "Status");
 
+                    b.HasIndex("Status", "ScheduledStartAt");
+
                     b.ToTable("Polls", (string)null);
+                });
+
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.PollCollaborator", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("PollId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("PollId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("PollCollaborators", (string)null);
                 });
 
             modelBuilder.Entity("OpenQuiz.Domain.Entities.ProcessedWebhookEvent", b =>
@@ -455,6 +541,85 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Questions", (string)null);
+                });
+
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.QuestionBankItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("AllowMultiple")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("CorrectAnswer")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("CorrectOptionIndex")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<int?>("MaxWords")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<byte>("QuestionType")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TimeLimit")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("WordCloudConfig")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.ToTable("QuestionBankItems", (string)null);
+                });
+
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.QuestionBankOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("OrderIndex")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItemId", "OrderIndex")
+                        .IsUnique();
+
+                    b.ToTable("QuestionBankOptions", (string)null);
                 });
 
             modelBuilder.Entity("OpenQuiz.Domain.Entities.Reaction", b =>
@@ -785,6 +950,17 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                     b.Navigation("BillingAccount");
                 });
 
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.MediaFile", b =>
+                {
+                    b.HasOne("OpenQuiz.Domain.Entities.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
             modelBuilder.Entity("OpenQuiz.Domain.Entities.Option", b =>
                 {
                     b.HasOne("OpenQuiz.Domain.Entities.Question", "Question")
@@ -829,6 +1005,25 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                     b.Navigation("Creator");
                 });
 
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.PollCollaborator", b =>
+                {
+                    b.HasOne("OpenQuiz.Domain.Entities.Poll", "Poll")
+                        .WithMany("Collaborators")
+                        .HasForeignKey("PollId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OpenQuiz.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Poll");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("OpenQuiz.Domain.Entities.Question", b =>
                 {
                     b.HasOne("OpenQuiz.Domain.Entities.Poll", "Poll")
@@ -838,6 +1033,28 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Poll");
+                });
+
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.QuestionBankItem", b =>
+                {
+                    b.HasOne("OpenQuiz.Domain.Entities.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.QuestionBankOption", b =>
+                {
+                    b.HasOne("OpenQuiz.Domain.Entities.QuestionBankItem", "Item")
+                        .WithMany("Options")
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Item");
                 });
 
             modelBuilder.Entity("OpenQuiz.Domain.Entities.RefreshToken", b =>
@@ -873,10 +1090,17 @@ namespace OpenQuiz.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("OpenQuiz.Domain.Entities.Poll", b =>
                 {
+                    b.Navigation("Collaborators");
+
                     b.Navigation("Questions");
                 });
 
             modelBuilder.Entity("OpenQuiz.Domain.Entities.Question", b =>
+                {
+                    b.Navigation("Options");
+                });
+
+            modelBuilder.Entity("OpenQuiz.Domain.Entities.QuestionBankItem", b =>
                 {
                     b.Navigation("Options");
                 });

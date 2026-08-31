@@ -5,12 +5,14 @@ namespace OpenQuiz.Application.Polls;
 public record CreatePollRequest(
     string Title,
     PollType Type,
-    List<QuestionInput> Questions);
+    List<QuestionInput> Questions,
+    DateTime? ScheduledStartAt = null);
 
 public record UpdatePollRequest(
     string Title,
     PollType Type,
-    List<QuestionInput> Questions);
+    List<QuestionInput> Questions,
+    DateTime? ScheduledStartAt = null);
 
 /// <summary>
 /// Copies a poll's questions into a fresh, unstarted one. The title is optional
@@ -58,7 +60,12 @@ public record PollDto(
     /// joiner or a phone with a wrong clock draw the same countdown as the room.
     /// </summary>
     DateTime ServerTime,
-    List<QuestionDto> Questions);
+    List<QuestionDto> Questions,
+    string? JoinCode,
+    DateTime? ScheduledStartAt,
+    string? ResultsShareToken,
+    bool IsCollaborator,
+    IReadOnlyList<CollaboratorDto> Collaborators);
 
 /// <summary>
 /// What the poll list needs. The full <see cref="PollDto"/> carries every
@@ -77,7 +84,11 @@ public record PollSummaryDto(
     string CreatorEmail,
     DateTime CreatedAt,
     DateTime? UpdatedAt,
-    int QuestionCount);
+    int QuestionCount,
+    string? JoinCode,
+    DateTime? ScheduledStartAt,
+    bool HasResultsShare,
+    bool IsCollaborator);
 
 public record QuestionDto(
     Guid Id,
@@ -97,3 +108,7 @@ public record QuestionDto(
 public record OptionDto(Guid Id, int OrderIndex, string Text);
 
 public record JoinPollRequest(string UserName);
+
+public record CollaboratorDto(Guid UserId, string Email);
+
+public record AddCollaboratorRequest(string Email);

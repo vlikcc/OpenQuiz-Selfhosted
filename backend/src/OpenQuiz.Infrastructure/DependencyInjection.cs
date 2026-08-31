@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.Configure<SmtpOptions>(config.GetSection(SmtpOptions.SectionName));
         services.Configure<AppOptions>(config.GetSection(AppOptions.SectionName));
         services.Configure<BillingOptions>(config.GetSection(BillingOptions.SectionName));
+        services.Configure<MediaOptions>(config.GetSection(MediaOptions.SectionName));
 
         var connectionString = config.GetConnectionString("Default")
             ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured.");
@@ -51,6 +52,8 @@ public static class DependencyInjection
         services.AddSingleton<IPaymentProvider, ManualPaymentProvider>();
         services.AddSingleton<IPaymentProviderRegistry, PaymentProviderRegistry>();
         services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
+        services.AddScoped<IMediaService, MediaService>();
+        services.AddScoped<IQuestionBankService, QuestionBankService>();
 
         return services;
     }

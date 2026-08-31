@@ -53,7 +53,7 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center p-4">
-      <div className="bg-white max-w-md w-full p-8 rounded-3xl shadow-2xl">
+      <div className="bg-white dark:bg-slate-800 max-w-md w-full p-8 rounded-3xl shadow-2xl">
         {onBack && (
           <button onClick={onBack} className="mb-4 text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm">
             <ArrowLeft size={16} /> {t('common.back')}
@@ -64,7 +64,7 @@ const AuthScreen = ({ onGoogleLogin, onEmailLogin, onEmailRegister, onPasswordRe
           <div className="w-16 h-16 mx-auto bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mb-3">
             <Trophy size={32} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             {mode === 'login' && t('auth.loginTitle')}
             {mode === 'register' && t('auth.registerTitle')}
             {mode === 'reset' && t('auth.resetTitle')}

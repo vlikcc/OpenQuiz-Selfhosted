@@ -11,7 +11,7 @@ const TabBar = ({ activeTab, onTabChange }) => {
     ];
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50 safe-area-bottom">
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 z-50 safe-area-bottom">
             <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
@@ -23,7 +23,7 @@ const TabBar = ({ activeTab, onTabChange }) => {
                             onClick={() => onTabChange(tab.id)}
                             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${isActive
                                     ? 'text-indigo-600'
-                                    : 'text-slate-400 hover:text-slate-600'
+                                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
                                 }`}
                         >
                             <Icon

@@ -7,7 +7,12 @@ import { POLL_TYPE_VALUE } from '../config/constants';
 import { EntitlementKeys } from '../config/entitlementKeys';
 
 vi.mock('../services/pollService', () => ({
-  pollService: { list: vi.fn(), get: vi.fn(), remove: vi.fn(), duplicate: vi.fn() },
+  pollService: { list: vi.fn(), get: vi.fn(), remove: vi.fn(), duplicate: vi.fn(), enableResultsShare: vi.fn() },
+}));
+vi.mock('../services/questionBankService', () => ({
+  questionBankService: { list: vi.fn(() => Promise.resolve([])), create: vi.fn(), remove: vi.fn() },
+  bankItemToDraft: (item) => item,
+  draftToBankRequest: (q) => q,
 }));
 
 vi.mock('./ResultsAnalysis', () => ({
@@ -83,6 +88,22 @@ describe('poll list paging', () => {
     renderDashboard();
 
     expect(await screen.findByText('3 Soru')).toBeInTheDocument();
+  });
+
+  it('hides edit and delete for a poll shared with the viewer', async () => {
+    pollService.list.mockResolvedValue(page([{
+      ...summary(1),
+      isCollaborator: true,
+      creatorEmail: 'owner@openquiz.test',
+    }], false));
+
+    renderDashboard();
+    await screen.findByText('Yarışma 1');
+
+    expect(screen.getByText('Paylaşıldı')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Düzenle' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sil' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Yönet ve Sun/ })).toBeInTheDocument();
   });
 });
 

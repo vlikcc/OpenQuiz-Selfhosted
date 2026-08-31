@@ -106,6 +106,12 @@ docker compose cp api:/app/logs ./api-logs
 Health probes log at Debug so they do not drown the requests you are looking
 for. Raise `Serilog__MinimumLevel__Default=Debug` to see them.
 
+Question images are stored on disk at `/app/data/media` and mounted as the
+`api-media` volume so they survive a container recreate. The API's
+`SessionScheduler` hosted service mails a reminder 15 minutes before a
+scheduled start (skipped when SMTP is not configured) and then activates the
+session as the creator.
+
 ## 6. Rate limiting
 
 Anonymous endpoints are rate limited per caller. Signed-in callers get a bucket keyed on

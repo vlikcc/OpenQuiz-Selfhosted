@@ -9,6 +9,11 @@ vi.mock('./hooks/useAuth', () => ({ useAuth: vi.fn() }));
 vi.mock('./services/pollService', () => ({
   pollService: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), join: vi.fn() },
 }));
+vi.mock('./services/questionBankService', () => ({
+  questionBankService: { list: vi.fn(() => Promise.resolve([])), create: vi.fn(), remove: vi.fn() },
+  bankItemToDraft: (item) => item,
+  draftToBankRequest: (q) => q,
+}));
 vi.mock('./services/authService', () => ({ authService: {} }));
 vi.mock('./services/tokenStore', () => ({ tokenStore: { getAccessToken: () => null, subscribe: () => () => {} } }));
 vi.mock('./services/realtimeService', () => ({

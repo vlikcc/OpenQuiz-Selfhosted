@@ -67,7 +67,7 @@ export default function BrandingSection({ showToast }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4 space-y-4">
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 bg-fuchsia-100 rounded-xl flex items-center justify-center">
           <Palette size={20} className="text-fuchsia-600" />

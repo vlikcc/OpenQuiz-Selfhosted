@@ -79,7 +79,7 @@ export default function WaitingRoom({ poll, participantCount, userName, branding
             </div>
 
             {poll.questions && (
-                <div className="mt-6 text-white/50 text-sm flex items-center gap-2">
+                <div className="mt-6 text-white/70 text-sm flex items-center gap-2">
                     <Trophy size={16} />
                     <span>{t('waiting.preparedCount', { n: poll.questions.length })}</span>
                 </div>

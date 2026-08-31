@@ -70,10 +70,15 @@ services:
       Billing__Currency: ${BILLING_CURRENCY:-TRY}
       Billing__WebhookSecret: ${BILLING_WEBHOOK_SECRET:-}
       Billing__CheckoutReturnUrl: ${BILLING_CHECKOUT_RETURN_URL:-}
+      Billing__Prices__pro__Monthly: ${BILLING_PRICE_PRO_MONTHLY:-499}
+      Billing__Prices__pro__Yearly: ${BILLING_PRICE_PRO_YEARLY:-4990}
+      Billing__Prices__team__Monthly: ${BILLING_PRICE_TEAM_MONTHLY:-1499}
+      Billing__Prices__team__Yearly: ${BILLING_PRICE_TEAM_YEARLY:-14990}
     ports:
       - "${API_PORT:-5080}:8080"
     volumes:
       - api-logs:/app/logs
+      - api-media:/app/data/media
     deploy:
       resources:
         limits:
@@ -109,3 +114,4 @@ services:
 volumes:
   mssql-data:
   api-logs:
+  api-media:

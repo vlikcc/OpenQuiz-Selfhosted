@@ -119,6 +119,56 @@ public class EntitlementService : IEntitlementService
             ct);
     }
 
+    public async Task EnsureWithinLimitForUserAsync(Guid userId, string limitKey, long attemptedTotal, CancellationToken ct)
+    {
+        var set = await ForUserAsync(userId, ct);
+        if (set.WithinLimit(limitKey, attemptedTotal)) return;
+
+        throw Errors.PlanLimitExceeded(limitKey, set.Limit(limitKey), attemptedTotal, RequiredPlanFor(limitKey), "Plan limit reached.");
+    }
+
+    public async Task<int> ReadUsageForUserAsync(Guid userId, string metric, CancellationToken ct)
+    {
+        var plan = await ResolveCachedAsync(userId, ct);
+        if (plan.BillingAccountId is not Guid billingAccountId) return 0;
+
+        var periodKey = UsagePeriod.KeyFor(plan.CurrentPeriodStart, DateTime.UtcNow);
+        var value = await _db.UsageCounters.AsNoTracking()
+            .Where(c => c.BillingAccountId == billingAccountId && c.Metric == metric && c.PeriodKey == periodKey)
+            .Select(c => (int?)c.Value)
+            .FirstOrDefaultAsync(ct);
+
+        return value ?? 0;
+    }
+
+    public async Task IncrementUsageForUserAsync(Guid userId, string metric, CancellationToken ct)
+    {
+        var plan = await ResolveCachedAsync(userId, ct);
+        if (plan.BillingAccountId is not Guid billingAccountId) return;
+
+        var periodKey = UsagePeriod.KeyFor(plan.CurrentPeriodStart, DateTime.UtcNow);
+
+        await ConcurrentCounters.IncrementOrCreateAsync(
+            token => _db.UsageCounters
+                .Where(c => c.BillingAccountId == billingAccountId && c.Metric == metric && c.PeriodKey == periodKey)
+                .ExecuteUpdateAsync(set => set
+                    .SetProperty(c => c.Value, c => c.Value + 1)
+                    .SetProperty(c => c.UpdatedAt, DateTime.UtcNow), token),
+            async token =>
+            {
+                _db.UsageCounters.Add(new UsageCounter
+                {
+                    BillingAccountId = billingAccountId,
+                    Metric = metric,
+                    PeriodKey = periodKey,
+                    Value = 1,
+                    UpdatedAt = DateTime.UtcNow,
+                });
+                await _db.SaveChangesAsync(token);
+            },
+            ct);
+    }
+
     private async Task<ResolvedPlan> ResolveCachedAsync(Guid userId, CancellationToken ct)
     {
         var cacheKey = PlanCacheKey(userId);

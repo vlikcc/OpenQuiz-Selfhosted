@@ -114,7 +114,41 @@
     "addQuestion": "Add question",
     "removeQuestion": "Remove question",
     "importFromFile": "Import from file",
-    "points": "Points:"
+    "points": "Points:",
+    "sharedBadge": "Shared with you",
+    "joinCodeCopied": "Room code copied"
+  },
+  "session": {
+    "joinCode": "Room code",
+    "addFromBank": "Add from bank",
+    "bank": "Question bank",
+    "bankEmpty": "No saved questions yet.",
+    "saveToBank": "Save to bank",
+    "savedToBank": "Saved to the question bank",
+    "importToBank": "Also save to the question bank",
+    "bankDeleted": "Removed from the bank",
+    "uploadImage": "Upload image",
+    "collaborators": "Co-presenters",
+    "addCollaborator": "Add by e-mail",
+    "collaboratorAdded": "Presenter added",
+    "collaboratorRemoved": "Presenter removed",
+    "schedule": "Scheduled start (optional)",
+    "scheduleHint": "The session starts automatically at this time. A reminder is mailed 15 minutes before if SMTP is configured.",
+    "shareResults": "Copy results link",
+    "shareResultsCopied": "Results link copied",
+    "disableShare": "Stop sharing results",
+    "resultsUnavailable": "This results link is not available.",
+    "joinFailed": "That room code was not found.",
+    "helpTitle": "Help",
+    "helpJoin": "Join with a code",
+    "helpJoinBody": "Open the join link or use the 6-character room code shown on the presenter's screen.",
+    "helpPresent": "Present a session",
+    "helpPresentBody": "From Home, tap Present. Use the arrow keys or Space to move between questions.",
+    "helpExport": "Export results",
+    "helpExportBody": "After a session ends, open Results. CSV, Excel and PDF export depend on your plan.",
+    "aboutTitle": "About OpenQuiz",
+    "themeLight": "Light",
+    "themeDark": "Dark"
   },
   "tabs": {
     "dashboard": "Home",
@@ -179,7 +213,7 @@
     "help": "Help",
     "helpDesc": "Frequently asked questions",
     "about": "About",
-    "version": "Version 1.0.0"
+    "version": "Version info"
   },
   "admin": {
     "title": "Admin panel",
@@ -253,7 +287,8 @@
     "shareButton": "Share Link",
     "shareTitle": "Join the Poll",
     "shareText": "Click the link to join {{title}}!",
-    "scanHint": "Scan the QR with your camera or share the link"
+    "scanHint": "Scan the QR with your camera or share the link",
+    "copyLink": "Copy join link"
   },
   "results": {
     "title": "{{title}} — Results Analysis",

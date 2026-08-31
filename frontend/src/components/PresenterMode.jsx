@@ -11,6 +11,7 @@ import { realtimeService } from '../services/realtimeService';
 import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import KatexText from './KatexText';
+import { mediaUrl } from '../utils/mediaUrl';
 import OpenAnswerList from './OpenAnswerList';
 import Leaderboard from './Leaderboard';
 import { mergeAnswerKey } from '../utils/pollAnswers';
@@ -136,6 +137,22 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
     }));
   }, [currentQ, currentAggregate]);
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (statusKey !== 'live') return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        pollService.prevQuestion(pollId).then(setPoll).catch((err) => showToast(err.message, 'error'));
+      } else if (e.key === 'ArrowRight' || e.key === ' ') {
+        e.preventDefault();
+        pollService.nextQuestion(pollId).then(setPoll).catch((err) => showToast(err.message, 'error'));
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [statusKey, pollId, showToast]);
+
   if (!poll) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
 
   const qTypeKey = currentQ ? (QUESTION_TYPE_KEY[currentQ.questionType] || 'multiple') : 'multiple';
@@ -165,15 +182,20 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
 
   return (
     <div className="h-full w-full flex flex-col bg-gradient-to-br from-slate-900 to-indigo-900 text-white overflow-hidden">
-      {showQr && <QrModal pollId={pollId} title={poll.title} onClose={() => setShowQr(false)} />}
+      {showQr && <QrModal pollId={pollId} title={poll.title} joinCode={poll.joinCode} onClose={() => setShowQr(false)} />}
 
       <header className="flex items-center justify-between p-4 bg-black/30 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={onExit} className="p-2 hover:bg-white/10 rounded-lg"><Home size={20} /></button>
+          <button onClick={onExit} aria-label={t('common.back')} className="p-2 hover:bg-white/10 rounded-lg"><Home size={20} /></button>
           <div>
             <h1 className="font-bold">{poll.title}</h1>
-            <p className="text-xs text-white/60">{typeCfg.icon} {ct(typeKey)}</p>
+            <p className="text-xs text-white/70">{typeCfg.icon} {ct(typeKey)}</p>
           </div>
+          {poll.joinCode && (
+            <span className="font-mono tracking-[0.2em] text-lg font-black bg-white/10 px-3 py-1 rounded-lg">
+              {poll.joinCode}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {reactionTally.length > 0 && (
@@ -183,10 +205,10 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
               ))}
             </span>
           )}
-          <span className="px-3 py-1 text-xs bg-white/10 rounded-full">
+          <span className="px-3 py-1 text-xs bg-white/10 rounded-full" aria-live="polite">
             <Users size={14} className="inline -mt-0.5" /> {poll.participantCount}
           </span>
-          <button onClick={() => setShowQr(true)} className="px-3 py-1.5 text-sm bg-indigo-500 hover:bg-indigo-600 rounded-lg flex items-center gap-1"><QrCode size={14} /> QR</button>
+          <button onClick={() => setShowQr(true)} aria-label={t('dashboard.showQr')} className="px-3 py-1.5 text-sm bg-indigo-500 hover:bg-indigo-600 rounded-lg flex items-center gap-1"><QrCode size={14} /> QR</button>
         </div>
       </header>
 
@@ -194,7 +216,10 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
         {statusKey === 'waiting' && (
           <div className="max-w-2xl mx-auto text-center p-10">
             <h2 className="text-3xl font-bold mb-4">{t('presenter.waitingRoomTitle')}</h2>
-            <p className="text-white/70 mb-6">{t('presenter.peopleJoined', { count: poll.participantCount || 0 })}</p>
+            {poll.joinCode && (
+              <p className="font-mono tracking-[0.35em] text-5xl sm:text-6xl font-black mb-6">{poll.joinCode}</p>
+            )}
+            <p className="text-white/70 mb-6" aria-live="polite">{t('presenter.peopleJoined', { count: poll.participantCount || 0 })}</p>
             <button onClick={handleActivate} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold flex items-center gap-2 mx-auto"><Play size={20} /> {t('presenter.startContest')}</button>
           </div>
         )}
@@ -202,15 +227,15 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
         {statusKey !== 'waiting' && currentQ && (
           <div className="max-w-5xl mx-auto">
             <div className="mb-6">
-              <div className="text-sm text-white/50 mb-2">{t('presenter.questionOf', { current: (poll.currentQuestionIndex || 0) + 1, total: poll.questions.length })}</div>
+              <div className="text-sm text-white/70 mb-2">{t('presenter.questionOf', { current: (poll.currentQuestionIndex || 0) + 1, total: poll.questions.length })}</div>
               <h2 className="text-3xl font-bold">
                 {typeKey === 'exam' && currentQ.text.includes('$') ? <KatexText text={currentQ.text} /> : currentQ.text}
               </h2>
               {/* A question whose picture only reached the phones was half a question. */}
               {currentQ.imageUrl && (
                 <img
-                  src={currentQ.imageUrl}
-                  alt=""
+                  src={mediaUrl(currentQ.imageUrl)}
+                  alt={currentQ.text}
                   className="mt-4 max-h-64 rounded-xl shadow-lg object-contain bg-black/20"
                 />
               )}
@@ -253,15 +278,15 @@ export default function PresenterMode({ pollId, onExit, showToast }) {
             </div>
 
             <div className="flex justify-between mt-6">
-              <button onClick={handlePrev} disabled={(poll.currentQuestionIndex || 0) === 0} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg disabled:opacity-30 flex items-center gap-1"><ChevronLeft size={16} /> {t('presenter.prev')}</button>
+              <button onClick={handlePrev} aria-label={t('presenter.prev')} disabled={(poll.currentQuestionIndex || 0) === 0} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg disabled:opacity-30 flex items-center gap-1"><ChevronLeft size={16} /> {t('presenter.prev')}</button>
               {statusKey === 'live' ? (
-                <button onClick={handleNext} className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 rounded-lg font-bold flex items-center gap-2">
+                <button onClick={handleNext} aria-label={t('presenter.next')} className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 rounded-lg font-bold flex items-center gap-2">
                   {(poll.currentQuestionIndex || 0) === poll.questions.length - 1 ? t('presenter.end') : t('presenter.next')} <ChevronRight size={16} />
                 </button>
               ) : (
                 <button onClick={onExit} className="px-6 py-3 bg-slate-600 hover:bg-slate-700 rounded-lg font-bold">{t('presenter.doneBack')}</button>
               )}
-              {statusKey === 'live' && <button onClick={handleEnd} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg flex items-center gap-1"><Square size={14} /> {t('presenter.endButton')}</button>}
+              {statusKey === 'live' && <button onClick={handleEnd} aria-label={t('presenter.endButton')} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 rounded-lg flex items-center gap-1"><Square size={14} /> {t('presenter.endButton')}</button>}
             </div>
           </div>
         )}

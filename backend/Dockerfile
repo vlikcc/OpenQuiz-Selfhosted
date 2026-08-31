@@ -25,7 +25,7 @@ COPY --from=build /app .
 # Serilog rolls its files here. The directory has to exist and belong to the
 # non-root user before the app starts, and it is a mount point in compose so
 # the logs outlive the container.
-RUN mkdir -p /app/logs && chown -R $APP_UID:$APP_UID /app/logs
+RUN mkdir -p /app/logs /app/data/media && chown -R $APP_UID:$APP_UID /app/logs /app/data
 
 USER $APP_UID
 

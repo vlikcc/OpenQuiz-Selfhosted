@@ -21,6 +21,13 @@ import ResetPasswordScreen from './components/ResetPasswordScreen';
 import UpgradeModal from './components/UpgradeModal';
 import { isPasswordResetPath, resetTokenFromSearch } from './utils/resetRoute';
 import { isBillingContactSearch, planFromSearch } from './utils/billingRoute';
+import {
+  isResultsSearch,
+  isVoterSearch,
+  resultsTokenFromSearch,
+  voterCodeFromSearch,
+  voterIdFromSearch,
+} from './utils/sessionRoute';
 
 // The presenter pulls in the charting stack and the admin panel is reachable by
 // a handful of accounts, so neither belongs in the bundle every voter downloads.
@@ -28,10 +35,7 @@ const PresenterMode = lazy(() => import('./components/PresenterMode'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const PricingScreen = lazy(() => import('./components/PricingScreen'));
 const BillingContactScreen = lazy(() => import('./components/BillingContactScreen'));
-
-const urlParams = new URLSearchParams(window.location.search);
-const isVoterMode = urlParams.get('mode') === 'voter' && !!urlParams.get('id');
-const initialPollId = urlParams.get('id');
+const ResultsShareScreen = lazy(() => import('./components/ResultsShareScreen'));
 
 const VoterLoadingScreen = ({ pollData }) => {
   const { t } = useTranslation();
@@ -87,13 +91,21 @@ export default function App() {
   const isAuthorized = !!user?.canCreate || isAdmin;
   const { can, plan, refresh: refreshEntitlements } = useEntitlements();
 
+  const search = window.location.search;
+  const isVoterMode = isVoterSearch(search);
+  const initialPollId = voterIdFromSearch(search);
+  const voterCode = voterCodeFromSearch(search);
+  const isResultsMode = isResultsSearch(search);
+  const resultsToken = resultsTokenFromSearch(search);
+
   const [preloadedPoll, setPreloadedPoll] = useState(null);
+  const [joinError, setJoinError] = useState(null);
   // Raised from anywhere a 402 (plan_limit_exceeded / plan_feature_required)
   // comes back from the API — see the setPlanLimitHandler wiring below.
   const [upgradeInfo, setUpgradeInfo] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeScreen, setActiveScreen] = useState('tabs');
-  const [activePollId, setActivePollId] = useState(() => initialPollId || localStorage.getItem('activePollId'));
+  const [activePollId, setActivePollId] = useState(() => voterIdFromSearch(window.location.search) || localStorage.getItem('activePollId'));
   const [toast, setToast] = useState(null);
   // null when the dashboard is showing the poll list, otherwise the poll being
   // composed: { contentType, pollId } with a null pollId for a new one.
@@ -106,13 +118,24 @@ export default function App() {
   // Manual checkout lands on `?billing=contact`; once the user leaves we
   // strip the query so a later dashboard render is not trapped here.
   const [leaveBillingContact, setLeaveBillingContact] = useState(false);
+  const [leaveResults, setLeaveResults] = useState(false);
   const [billingContactAuth, setBillingContactAuth] = useState(false);
 
-  // QR voter preload
+  // QR / room-code voter preload
   useEffect(() => {
-    if (!isVoterMode || !initialPollId) return;
-    pollService.get(initialPollId).then(setPreloadedPoll).catch(console.error);
-  }, []);
+    if (!isVoterMode) return;
+    if (initialPollId) {
+      pollService.get(initialPollId).then(setPreloadedPoll).catch(console.error);
+      return;
+    }
+    if (!voterCode) return;
+    pollService.getByCode(voterCode)
+      .then((poll) => {
+        setPreloadedPoll(poll);
+        setActivePollId(poll.id);
+      })
+      .catch(() => setJoinError(t('session.joinFailed')));
+  }, [isVoterMode, initialPollId, voterCode, t]);
 
   useEffect(() => {
     if (activePollId) localStorage.setItem('activePollId', activePollId);
@@ -194,8 +217,34 @@ export default function App() {
     );
   }
 
+  if (isResultsMode && resultsToken && !leaveResults) {
+    return (
+      <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
+        <Suspense fallback={<LoadingPanel />}>
+          <ResultsShareScreen
+            token={resultsToken}
+            onClose={() => {
+              window.history.replaceState({}, '', window.location.pathname || '/');
+              setLeaveResults(true);
+            }}
+          />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
   // QR Voter Mode
-  if (isVoterMode && initialPollId) {
+  if (isVoterMode) {
+    if (joinError) {
+      return (
+        <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
+          <div className="h-full w-full flex items-center justify-center bg-slate-50 p-8 text-center text-slate-600">
+            {joinError}
+          </div>
+        </ErrorBoundary>
+      );
+    }
+    if (!activePollId) return <VoterLoadingScreen pollData={preloadedPoll} />;
     if (authLoading && tokenStore.getAccessToken()) return <VoterLoadingScreen pollData={preloadedPoll} />;
     return (
       <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
@@ -350,7 +399,7 @@ export default function App() {
 
   return (
     <ErrorBoundary fallbackMessage={t('common.errorRefresh')}>
-      <div className="h-full w-full bg-slate-50 flex flex-col overflow-hidden">
+      <div className="h-full w-full bg-slate-50 dark:bg-slate-900 flex flex-col overflow-hidden">
         {toast && (
           <div className={`fixed top-4 left-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium flex items-center gap-2 animate-bounce-in z-50 ${toast.type === 'error' ? 'bg-red-600' : 'bg-slate-800'}`}>
             {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}

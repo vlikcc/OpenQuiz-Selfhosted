@@ -12,6 +12,7 @@ import KatexText from './KatexText';
 import WaitingRoom from './WaitingRoom';
 import WordCloudVoter from './wordcloud/WordCloudVoter';
 import { clockOffsetMs, deadlineFor, secondsLeft } from '../utils/questionClock';
+import { mediaUrl } from '../utils/mediaUrl';
 
 export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
   const { t } = useTranslation();
@@ -243,7 +244,8 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
           {branding?.joinMessage && <p className="text-slate-500 text-sm mb-4">{branding.joinMessage}</p>}
           <p className="text-slate-500 text-sm mb-6">{poll.questions?.length || 0} {t('common.question')}</p>
           <form onSubmit={handleStart}>
-            <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl mb-4 text-center font-bold text-lg focus:border-indigo-500 outline-none" placeholder={t('voter.yourName')} required />
+            <label htmlFor="voter-name" className="block text-sm font-medium text-slate-600 mb-2">{t('voter.yourName')}</label>
+            <input id="voter-name" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl mb-4 text-center font-bold text-lg focus:border-indigo-500 outline-none" placeholder={t('voter.yourName')} required />
             <button type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold text-lg">{t('voter.join')}</button>
           </form>
           {!branding?.hideOpenQuizBranding && (
@@ -319,7 +321,7 @@ export default function VoterMode({ pollId, showToast, preloadedPoll = null }) {
         </div>
 
         <div className="text-lg sm:text-xl font-bold text-slate-900">
-          {q.imageUrl && (<div className="mb-4"><img src={q.imageUrl} alt="" className="max-h-48 rounded-lg shadow-sm mx-auto object-contain" /></div>)}
+          {q.imageUrl && (<div className="mb-4"><img src={mediaUrl(q.imageUrl)} alt={q.text} className="max-h-48 rounded-lg shadow-sm mx-auto object-contain" /></div>)}
           {isExam && q.text.includes('$') ? <KatexText text={q.text} /> : q.text}
         </div>
 

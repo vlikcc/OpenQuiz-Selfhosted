@@ -16,4 +16,13 @@ public interface IPollService
     Task<PollDto> PrevQuestionAsync(Guid id, CancellationToken ct);
     Task<PollDto> EndAsync(Guid id, CancellationToken ct);
     Task<PollDto> JoinAsync(Guid id, JoinPollRequest req, CancellationToken ct);
+    Task<PollDto?> GetByJoinCodeAsync(string code, CancellationToken ct);
+    Task<IReadOnlyList<CollaboratorDto>> ListCollaboratorsAsync(Guid pollId, CancellationToken ct);
+    Task<CollaboratorDto> AddCollaboratorAsync(Guid pollId, AddCollaboratorRequest req, CancellationToken ct);
+    Task RemoveCollaboratorAsync(Guid pollId, Guid userId, CancellationToken ct);
+    Task<PollDto> EnableResultsShareAsync(Guid id, CancellationToken ct);
+    Task DisableResultsShareAsync(Guid id, CancellationToken ct);
+    Task<PollDto?> GetByShareTokenAsync(string token, CancellationToken ct);
+    /// <summary>Scheduler tick: reminder mails then auto-activate due waiting polls.</summary>
+    Task ProcessScheduledAsync(CancellationToken ct);
 }

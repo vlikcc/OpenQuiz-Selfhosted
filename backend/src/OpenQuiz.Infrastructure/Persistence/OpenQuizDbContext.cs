@@ -26,6 +26,10 @@ public class OpenQuizDbContext : DbContext
     public DbSet<BrandingSettings> BrandingSettings => Set<BrandingSettings>();
     public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents => Set<ProcessedWebhookEvent>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+    public DbSet<PollCollaborator> PollCollaborators => Set<PollCollaborator>();
+    public DbSet<QuestionBankItem> QuestionBankItems => Set<QuestionBankItem>();
+    public DbSet<QuestionBankOption> QuestionBankOptions => Set<QuestionBankOption>();
+    public DbSet<MediaFile> MediaFiles => Set<MediaFile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useState, useEffect } from 'react';
-import { Trash2, Smartphone, Users, AlertTriangle, Copy, CopyPlus, QrCode, Loader2, Edit2, BarChart3, Lock, CreditCard } from 'lucide-react';
-import { CONTENT_TYPES, POLL_TYPE_KEY } from '../config/constants';
+import { Trash2, Smartphone, Users, AlertTriangle, Copy, CopyPlus, QrCode, Loader2, Edit2, BarChart3, Lock, CreditCard, Link } from 'lucide-react';
+import { CONTENT_TYPES, POLL_TYPE_KEY, POLL_STATUS_KEY } from '../config/constants';
 import { EntitlementKeys } from '../config/entitlementKeys';
 import { PLAN_LABEL_I18N } from '../config/planLabels';
 import { pollService } from '../services/pollService';
@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import QrModal from './QrModal';
 import LoadingPanel from './LoadingPanel';
 import UpgradeModal from './UpgradeModal';
+import QuestionBankPanel from './QuestionBankPanel';
+import { resultsShareUrl } from '../utils/sessionRoute';
 
 // Only these two content types are plan-gated today (see EntitlementKeys on
 // the backend) — Contest/Survey/Quiz have no feature key and are always on.
@@ -92,7 +94,7 @@ export default function Dashboard({
   };
 
   const copyToClipboard = async (text) => {
-    try { await navigator.clipboard.writeText(text); showToast(t('dashboard.idCopied')); }
+    try { await navigator.clipboard.writeText(text); showToast(t('dashboard.joinCodeCopied')); }
     catch { showToast(t('common.copyFailed'), 'error'); }
   };
 
@@ -129,6 +131,18 @@ export default function Dashboard({
     }
   };
 
+  const handleShareResults = async (poll) => {
+    try {
+      const updated = await pollService.enableResultsShare(poll.id);
+      const url = resultsShareUrl(window.location.origin, updated.resultsShareToken);
+      await navigator.clipboard.writeText(url);
+      showToast(t('session.shareResultsCopied'));
+      await loadPage(1);
+    } catch (err) {
+      showToast(err.message || t('common.errorOccurred'), 'error');
+    }
+  };
+
   const handleSaved = async () => {
     setComposer(null);
     await loadPage(1);
@@ -137,9 +151,9 @@ export default function Dashboard({
   const typeKey = (poll) => POLL_TYPE_KEY[poll.type] || 'contest';
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden bg-slate-50">
+    <div className="w-full h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
       <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 custom-scrollbar">
-        {qrPoll && <QrModal pollId={qrPoll.id} title={qrPoll.title} onClose={() => setQrPoll(null)} />}
+        {qrPoll && <QrModal pollId={qrPoll.id} title={qrPoll.title} joinCode={qrPoll.joinCode} onClose={() => setQrPoll(null)} />}
         {upgradePrompt && (
           <UpgradeModal
             info={{ code: 'plan_feature_required', featureKey: upgradePrompt }}
@@ -159,8 +173,8 @@ export default function Dashboard({
 
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{isAdmin ? t('dashboard.allPolls') : t('dashboard.myPolls')}</h1>
-            <p className="text-slate-500 text-sm sm:text-base">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-slate-100">{isAdmin ? t('dashboard.allPolls') : t('dashboard.myPolls')}</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base">
               {isAdmin ? t('dashboard.adminSubtitle') :
                 canCreateQuiz ? t('dashboard.creatorSubtitle') : t('dashboard.voterSubtitle')}
             </p>
@@ -214,33 +228,48 @@ export default function Dashboard({
         ) : loading ? (
           <div className="text-center py-10"><Loader2 className="animate-spin text-indigo-600 mx-auto" /></div>
         ) : (
+          <>
+          {canCreateQuiz && <QuestionBankPanel showToast={showToast} />}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
             {polls.map((poll) => {
               const tk = typeKey(poll);
               const cfg = CONTENT_TYPES[tk] || CONTENT_TYPES.contest;
-              const canDelete = isAdmin || poll.creatorEmail === user.email;
+              const isShared = !!poll.isCollaborator;
+              const canAuthor = !isShared && (isAdmin || poll.creatorEmail === user.email);
+              const ended = (POLL_STATUS_KEY[poll.status] || '') === 'ended';
               return (
-                <div key={poll.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 hover:shadow-lg flex flex-col group min-h-[220px]">
+                <div key={poll.id} className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-lg flex flex-col group min-h-[220px]">
                   <div className="flex justify-between items-start mb-3">
                     <div className={`${cfg.classes.soft} p-2 rounded-lg`}><span className="text-lg">{cfg.icon}</span></div>
                     <div className="flex gap-1">
-                      <button aria-label={t('dashboard.showQr')} onClick={() => setQrPoll(poll)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"><QrCode size={16} /></button>
-                      {canDelete && <button aria-label={t('common.delete')} onClick={() => handleDeletePoll(poll)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>}
-                      {canCreateQuiz && <button aria-label={t('dashboard.duplicate')} onClick={() => handleDuplicate(poll)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg"><CopyPlus size={16} /></button>}
-                      {canDelete && <button aria-label={t('common.edit')} onClick={() => setComposer({ contentType: tk, pollId: poll.id })} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={16} /></button>}
+                      <button aria-label={t('dashboard.showQr')} onClick={() => setQrPoll(poll)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><QrCode size={16} /></button>
+                      {canAuthor && <button aria-label={t('common.delete')} onClick={() => handleDeletePoll(poll)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>}
+                      {canAuthor && canCreateQuiz && <button aria-label={t('dashboard.duplicate')} onClick={() => handleDuplicate(poll)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><CopyPlus size={16} /></button>}
+                      {canAuthor && <button aria-label={t('common.edit')} onClick={() => setComposer({ contentType: tk, pollId: poll.id })} className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit2 size={16} /></button>}
                     </div>
                   </div>
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${cfg.classes.badge} w-fit`}>{ct(tk)}</span>
-                  <h3 className="text-base sm:text-lg font-bold mt-2 mb-2 line-clamp-2 text-slate-800">{poll.title || t('common.untitled')}</h3>
+                  <div className="flex flex-wrap gap-1 mb-1">
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${cfg.classes.badge} w-fit`}>{ct(tk)}</span>
+                    {isShared && (
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-700 w-fit">{t('dashboard.sharedBadge')}</span>
+                    )}
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold mt-2 mb-2 line-clamp-2 text-slate-800 dark:text-slate-100">{poll.title || t('common.untitled')}</h3>
+                  {poll.joinCode && (
+                    <p className="font-mono tracking-[0.2em] text-sm font-black text-slate-700 dark:text-slate-200 mb-2">{poll.joinCode}</p>
+                  )}
                   <p className="text-sm text-slate-500 mb-4 flex items-center gap-2">
-                    <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-bold">{t('dashboard.questionCount', { count: poll.questionCount || 0 })}</span>
+                    <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-xs font-bold">{t('dashboard.questionCount', { count: poll.questionCount || 0 })}</span>
                     {poll.creatorEmail && isAdmin && <span className="text-xs text-slate-400 truncate max-w-[150px]">• {poll.creatorEmail.split('@')[0]}</span>}
                   </p>
                   <div className="mt-auto grid grid-cols-3 gap-2">
                     <button onClick={() => onNavigate('presenter', poll.id)} className="col-span-3 py-2 bg-slate-900 text-white rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-slate-800 text-sm"><Users size={16} /> {t('dashboard.manage')}</button>
-                    <button onClick={() => copyToClipboard(poll.id)} className="py-2 border border-slate-200 text-slate-600 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 text-xs"><Copy size={14} /> ID</button>
-                    <button onClick={() => onNavigate('voter', poll.id)} className="py-2 border border-slate-200 text-slate-600 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 text-xs"><Smartphone size={14} /> {t('dashboard.test')}</button>
-                    <button onClick={() => handleShowResults(poll)} className="py-2 border border-slate-200 text-slate-600 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 text-xs"><BarChart3 size={14} /> {t('dashboard.results')}</button>
+                    <button onClick={() => copyToClipboard(poll.joinCode || poll.id)} className="py-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs"><Copy size={14} /> {poll.joinCode ? t('session.joinCode') : 'ID'}</button>
+                    <button onClick={() => onNavigate('voter', poll.id)} className="py-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs"><Smartphone size={14} /> {t('dashboard.test')}</button>
+                    <button onClick={() => handleShowResults(poll)} className="py-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs"><BarChart3 size={14} /> {t('dashboard.results')}</button>
+                    {canAuthor && ended && (
+                      <button onClick={() => handleShareResults(poll)} className="col-span-3 py-2 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs"><Link size={14} /> {t('session.shareResults')}</button>
+                    )}
                   </div>
                 </div>
               );
@@ -259,6 +288,7 @@ export default function Dashboard({
               </div>
             )}
           </div>
+          </>
         )}
       </div>
     </div>

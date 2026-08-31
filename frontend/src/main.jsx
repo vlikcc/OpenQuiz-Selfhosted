@@ -5,6 +5,9 @@ import { GOOGLE_CLIENT_ID } from './config/constants';
 import App from './App.jsx';
 import './index.css';
 import './i18n';
+import { initTheme } from './utils/theme';
+
+initTheme();
 
 const root = createRoot(document.getElementById('root'));
 

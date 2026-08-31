@@ -1,14 +1,25 @@
 import { Suspense, lazy, useState } from 'react';
-import { Plus, Trash2, XCircle, Upload, BookOpen, Image as ImageIcon, Timer, Lock } from 'lucide-react';
+import { Plus, Trash2, XCircle, Upload, BookOpen, Image as ImageIcon, Timer, Lock, BookMarked } from 'lucide-react';
 import { CONTENT_TYPES, POLL_TYPE_VALUE, QUESTION_TYPE_VALUE, QUESTION_TYPE_KEY } from '../config/constants';
 import { EntitlementKeys } from '../config/entitlementKeys';
 import { pollService } from '../services/pollService';
+import { mediaService } from '../services/mediaService';
+import { draftToBankRequest, questionBankService } from '../services/questionBankService';
 import { useTranslation } from 'react-i18next';
 import { useEntitlements } from '../hooks/useEntitlements';
 import KatexText, { KatexTextEditor } from './KatexText';
 import { KATEX_EXAMPLES } from '../config/katexExamples';
 import { DEFAULT_MODERATION, parseModeration, toWordCloudConfig } from '../utils/wordCloudSettings';
 import WordCloudModeration from './wordcloud/WordCloudModeration';
+import QuestionBankPanel from './QuestionBankPanel';
+
+function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 // Carries the spreadsheet and Word parsers, and most polls are typed by hand.
 const FileImport = lazy(() => import('./FileImport'));
@@ -68,7 +79,11 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
   const [questions, setQuestions] = useState(() => (poll ? draftFromPoll(poll) : [blankFor(contentType)]));
   const [showKatexHelp, setShowKatexHelp] = useState(false);
   const [showFileImport, setShowFileImport] = useState(false);
+  const [showBank, setShowBank] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [scheduledLocal, setScheduledLocal] = useState(() => toLocalInput(poll?.scheduledStartAt));
+  const [collabEmail, setCollabEmail] = useState('');
+  const [collaborators, setCollaborators] = useState(poll?.collaborators || []);
 
   const typeConfig = CONTENT_TYPES[contentType];
   const ct = (key) => t(`contentTypes.${key}.label`);
@@ -89,16 +104,72 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
     );
   }
 
-  const handleImportQuestions = (importedQuestions) => {
-    setQuestions(importedQuestions.map((q) => ({
+  const handleImportQuestions = async (importedQuestions, { saveToBank } = {}) => {
+    const mapped = importedQuestions.map((q) => ({
       text: q.text,
       options: q.options,
       correctIndex: q.correctIndex || 0,
       questionType: 'multiple',
       image: '',
       timeLimit: 30,
-    })));
+    }));
+    setQuestions(mapped);
     showToast(t('dashboard.importedQuestions', { count: importedQuestions.length }));
+    if (saveToBank) {
+      try {
+        for (const q of mapped) await questionBankService.create(draftToBankRequest(q));
+        showToast(t('session.savedToBank'));
+      } catch (err) {
+        showToast(err.message || t('common.errorOccurred'), 'error');
+      }
+    }
+  };
+
+  const addFromBank = (draft) => {
+    setQuestions((qs) => [...qs, draft]);
+    setShowBank(false);
+  };
+
+  const saveQuestionToBank = async (q) => {
+    try {
+      await questionBankService.create(draftToBankRequest(q));
+      showToast(t('session.savedToBank'));
+    } catch (err) {
+      showToast(err.message || t('common.errorOccurred'), 'error');
+    }
+  };
+
+  const uploadQuestionImage = async (qIndex, file) => {
+    if (!file) return;
+    try {
+      const saved = await mediaService.upload(file);
+      updateField(qIndex, 'image', saved.url);
+    } catch (err) {
+      showToast(err.message || t('common.errorOccurred'), 'error');
+    }
+  };
+
+  const addCollaborator = async () => {
+    if (!poll?.id || !collabEmail.trim()) return;
+    try {
+      const row = await pollService.addCollaborator(poll.id, collabEmail.trim());
+      setCollaborators((rows) => [...rows, row]);
+      setCollabEmail('');
+      showToast(t('session.collaboratorAdded'));
+    } catch (err) {
+      showToast(err.message || t('common.errorOccurred'), 'error');
+    }
+  };
+
+  const removeCollaborator = async (userId) => {
+    if (!poll?.id) return;
+    try {
+      await pollService.removeCollaborator(poll.id, userId);
+      setCollaborators((rows) => rows.filter((c) => c.userId !== userId));
+      showToast(t('session.collaboratorRemoved'));
+    } catch (err) {
+      showToast(err.message || t('common.errorOccurred'), 'error');
+    }
   };
 
   const addQuestion = (qType = 'multiple') => {
@@ -146,6 +217,7 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
     const payload = {
       title: quizTitle,
       type: POLL_TYPE_VALUE[contentType],
+      scheduledStartAt: scheduledLocal ? new Date(scheduledLocal).toISOString() : null,
       questions: questions.map((q, idx) => ({
         orderIndex: idx,
         text: q.text,
@@ -182,7 +254,7 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
   };
 
   return (
-    <div className="bg-white p-4 sm:p-6 lg:p-8 rounded-2xl shadow-xl border border-indigo-50 max-w-6xl mx-auto">
+    <div className="bg-white dark:bg-slate-800 p-4 sm:p-6 lg:p-8 rounded-2xl shadow-xl border border-indigo-50 dark:border-slate-700 max-w-6xl mx-auto">
       {showFileImport && (
         <Suspense fallback={null}>
           <FileImport onImport={handleImportQuestions} onClose={() => setShowFileImport(false)} />
@@ -202,10 +274,47 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
           type="text"
           value={quizTitle}
           onChange={(e) => setQuizTitle(e.target.value)}
-          className="w-full p-3 sm:p-4 text-base sm:text-lg border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none"
+          className="w-full p-3 sm:p-4 text-base sm:text-lg border-2 border-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl focus:border-indigo-500 outline-none"
           placeholder={contentType === 'wordcloud' ? t('dashboard.titlePlaceholderWordcloud') : t('dashboard.titlePlaceholderDefault')}
         />
       </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">{t('session.schedule')}</label>
+        <input
+          type="datetime-local"
+          value={scheduledLocal}
+          onChange={(e) => setScheduledLocal(e.target.value)}
+          className="w-full sm:w-auto p-3 border-2 border-slate-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 rounded-xl outline-none focus:border-indigo-500"
+        />
+        <p className="text-xs text-slate-400 mt-1">{t('session.scheduleHint')}</p>
+      </div>
+
+      {poll?.id && !poll.isCollaborator && (
+        <div className="mb-6 bg-slate-50 dark:bg-slate-900/60 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 mb-2">{t('session.collaborators')}</h3>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="email"
+              value={collabEmail}
+              onChange={(e) => setCollabEmail(e.target.value)}
+              placeholder={t('session.addCollaborator')}
+              className="flex-1 p-2 text-sm border border-slate-300 dark:border-slate-600 dark:bg-slate-900 rounded-lg outline-none"
+            />
+            <button type="button" onClick={addCollaborator} className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold">
+              {t('common.save')}
+            </button>
+          </div>
+          <ul className="space-y-1">
+            {collaborators.map((c) => (
+              <li key={c.userId} className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
+                <span>{c.email}</span>
+                <button type="button" onClick={() => removeCollaborator(c.userId)} className="text-red-500 text-xs font-bold">{t('common.delete')}</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {contentType === 'exam' && (
         <div className="mb-6">
@@ -244,6 +353,7 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
                   <input type="number" value={q.points || 10} onChange={(e) => updateField(qIndex, 'points', parseInt(e.target.value, 10) || 10)} className="w-12 text-center text-sm font-bold text-rose-600 outline-none" min="1" />
                 </div>
               )}
+              <button aria-label={t('session.saveToBank')} onClick={() => saveQuestionToBank(q)} className="text-indigo-400 hover:text-indigo-600 p-2"><BookMarked size={20} /></button>
               <button aria-label={t('dashboard.removeQuestion')} onClick={() => removeQuestion(qIndex)} className="text-red-400 hover:text-red-600 p-2"><Trash2 size={20} /></button>
             </div>
 
@@ -258,7 +368,22 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
               <div className="flex gap-4 mb-3">
                 <div className="flex-1">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><ImageIcon size={14} /> {t('dashboard.imageUrl')}</label>
-                  <input type="text" value={q.image || ''} onChange={(e) => updateField(qIndex, 'image', e.target.value)} className="w-full p-2 text-sm bg-white border border-slate-300 rounded-lg outline-none focus:border-indigo-500" placeholder="https://..." />
+                  <div className="flex gap-2">
+                    <input type="text" value={q.image || ''} onChange={(e) => updateField(qIndex, 'image', e.target.value)} className="flex-1 p-2 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-indigo-500" placeholder="https://..." />
+                    <label className="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-lg text-xs font-bold cursor-pointer whitespace-nowrap">
+                      {t('session.uploadImage')}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          uploadQuestionImage(qIndex, file);
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
                 <div className="w-24">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><Timer size={14} /> {t('dashboard.timeLimit')}</label>
@@ -326,6 +451,12 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
         ))}
       </div>
 
+      {showBank && (
+        <div className="mt-6">
+          <QuestionBankPanel showToast={showToast} onPick={addFromBank} compact />
+        </div>
+      )}
+
       <div className="mt-8 flex flex-col md:flex-row gap-4 justify-between items-center border-t pt-6">
         <div className="flex flex-wrap gap-3">
           {contentType === 'exam' ? (
@@ -341,6 +472,9 @@ export default function PollForm({ contentType, poll = null, showToast, onCancel
           {contentType !== 'wordcloud' && (
             <button type="button" onClick={() => setShowFileImport(true)} className="py-3 px-6 bg-emerald-100 text-emerald-700 rounded-xl font-bold flex items-center gap-2"><Upload size={20} /> {t('dashboard.importFromFile')}</button>
           )}
+          <button type="button" onClick={() => setShowBank((open) => !open)} className="py-3 px-6 bg-indigo-100 text-indigo-700 rounded-xl font-bold flex items-center gap-2">
+            <BookMarked size={20} /> {t('session.addFromBank')}
+          </button>
         </div>
         <div className="flex gap-4">
           <button type="button" onClick={onCancel} className="py-3 px-6 text-slate-500 hover:bg-slate-50 rounded-xl font-medium">{t('common.cancel')}</button>

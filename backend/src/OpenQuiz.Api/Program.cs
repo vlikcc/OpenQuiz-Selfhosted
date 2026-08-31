@@ -31,6 +31,7 @@ builder.Host.UseSerilog((ctx, lc) => lc
 // --- Services ---
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
+builder.Services.AddHostedService<OpenQuiz.Api.Hosting.SessionScheduler>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();

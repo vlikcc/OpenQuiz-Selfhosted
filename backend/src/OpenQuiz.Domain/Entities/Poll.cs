@@ -22,10 +22,20 @@ public class Poll
     public Guid CreatorId { get; set; }
     public User Creator { get; set; } = null!;
 
+    /// <summary>Six-character room code. Null only on rows that predate the column until first read backfills it.</summary>
+    public string? JoinCode { get; set; }
+
+    public DateTime? ScheduledStartAt { get; set; }
+    public DateTime? ReminderSentAt { get; set; }
+
+    /// <summary>Unguessable token for the public ended-results page. Null until the owner turns sharing on.</summary>
+    public string? ResultsShareToken { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
     public byte[] RowVersion { get; set; } = [];
 
     public ICollection<Question> Questions { get; set; } = new List<Question>();
+    public ICollection<PollCollaborator> Collaborators { get; set; } = new List<PollCollaborator>();
 }

@@ -35,4 +35,8 @@ public interface IEntitlementService
 
     /// <summary>Bumps a metric's current-period counter by one, creating the row on first use of a period.</summary>
     Task IncrementUsageAsync(string metric, CancellationToken ct);
+
+    Task EnsureWithinLimitForUserAsync(Guid userId, string limitKey, long attemptedTotal, CancellationToken ct);
+    Task<int> ReadUsageForUserAsync(Guid userId, string metric, CancellationToken ct);
+    Task IncrementUsageForUserAsync(Guid userId, string metric, CancellationToken ct);
 }

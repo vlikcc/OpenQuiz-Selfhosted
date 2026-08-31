@@ -3,11 +3,14 @@ import { FileSpreadsheet, FileText, Upload, X, AlertTriangle, CheckCircle2, Load
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
 import { parseQuestionRows } from '../utils/questionImport';
+import { useTranslation } from 'react-i18next';
 
 export default function FileImport({ onImport, onClose }) {
+  const { t } = useTranslation();
   const [importing, setImporting] = useState(false);
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState(null);
+  const [saveToBank, setSaveToBank] = useState(false);
   const fileInputRef = useRef(null);
 
   const parseExcel = async (file) => {
@@ -142,7 +145,7 @@ export default function FileImport({ onImport, onClose }) {
 
   const handleImport = () => {
     if (preview && preview.length > 0) {
-      onImport(preview);
+      onImport(preview, { saveToBank });
       onClose();
     }
   };
@@ -274,10 +277,16 @@ Cevap: A`}
             İptal
           </button>
           {preview && (
-            <button onClick={handleImport} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2">
-              <CheckCircle2 size={18} />
-              {preview.length} Soruyu İçe Aktar
-            </button>
+            <>
+              <label className="mr-auto flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={saveToBank} onChange={(e) => setSaveToBank(e.target.checked)} className="accent-indigo-600" />
+                {t('session.importToBank')}
+              </label>
+              <button onClick={handleImport} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                <CheckCircle2 size={18} />
+                {preview.length} Soruyu İçe Aktar
+              </button>
+            </>
           )}
         </div>
       </div>

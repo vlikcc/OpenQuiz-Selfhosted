@@ -114,7 +114,41 @@
     "addQuestion": "Soru Ekle",
     "removeQuestion": "Soruyu kaldır",
     "importFromFile": "Dosyadan Yükle",
-    "points": "Puan:"
+    "points": "Puan:",
+    "sharedBadge": "Paylaşıldı",
+    "joinCodeCopied": "Oda kodu kopyalandı"
+  },
+  "session": {
+    "joinCode": "Oda kodu",
+    "addFromBank": "Bankadan ekle",
+    "bank": "Soru bankası",
+    "bankEmpty": "Kayıtlı soru yok.",
+    "saveToBank": "Bankaya kaydet",
+    "savedToBank": "Soru bankasına kaydedildi",
+    "importToBank": "Ayrıca soru bankasına kaydet",
+    "bankDeleted": "Bankadan silindi",
+    "uploadImage": "Görsel yükle",
+    "collaborators": "Sunum yardımcıları",
+    "addCollaborator": "E-posta ile ekle",
+    "collaboratorAdded": "Yardımcı eklendi",
+    "collaboratorRemoved": "Yardımcı çıkarıldı",
+    "schedule": "Zamanlanmış başlangıç (isteğe bağlı)",
+    "scheduleHint": "Bu saatte oturum kendiliğinden başlar. SMTP ayarlıysa 15 dakika önce hatırlatma gider.",
+    "shareResults": "Sonuç linkini kopyala",
+    "shareResultsCopied": "Sonuç linki kopyalandı",
+    "disableShare": "Sonuç paylaşımını kapat",
+    "resultsUnavailable": "Bu sonuç linki kullanılamıyor.",
+    "joinFailed": "Bu oda kodu bulunamadı.",
+    "helpTitle": "Yardım",
+    "helpJoin": "Kodla katıl",
+    "helpJoinBody": "Katılım linkini açın veya sunucu ekranındaki 6 karakterlik oda kodunu kullanın.",
+    "helpPresent": "Oturum sun",
+    "helpPresentBody": "Ana sayfadan Sun’a dokunun. Sorular arasında ok tuşları veya Space ile gezinirsiniz.",
+    "helpExport": "Sonuçları dışa aktar",
+    "helpExportBody": "Oturum bitince Sonuçlar’ı açın. CSV, Excel ve PDF planınıza bağlıdır.",
+    "aboutTitle": "OpenQuiz hakkında",
+    "themeLight": "Açık",
+    "themeDark": "Koyu"
   },
   "tabs": {
     "dashboard": "Ana Sayfa",
@@ -179,7 +213,7 @@
     "help": "Yardım",
     "helpDesc": "Sık sorulan sorular",
     "about": "Hakkında",
-    "version": "Versiyon 1.0.0"
+    "version": "Sürüm bilgisi"
   },
   "admin": {
     "title": "Admin Paneli",
@@ -253,7 +287,8 @@
     "shareButton": "Linki Paylaş",
     "shareTitle": "Yarışmaya Katıl",
     "shareText": "{{title}} yarışmasına katılmak için linke tıkla!",
-    "scanHint": "Telefonun kamerasıyla QR'ı okut veya linki paylaş"
+    "scanHint": "Telefonun kamerasıyla QR'ı okut veya linki paylaş",
+    "copyLink": "Katılım linkini kopyala"
   },
   "results": {
     "title": "{{title}} — Sonuç Analizi",

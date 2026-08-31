@@ -39,14 +39,14 @@ export default function BillingSection({ showToast }) {
   const sessionsUsed = usage?.[EntitlementKeys.LimitSessionsPerMonth] ?? 0;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4 space-y-4">
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
           <CreditCard size={20} className="text-indigo-600" />
         </div>
         <div className="flex-1">
           <div className="text-xs text-slate-500">{t('billing.currentPlan')}</div>
-          <div className="font-semibold text-slate-800">{planLabel}</div>
+          <div className="font-semibold text-slate-800 dark:text-slate-100">{planLabel}</div>
         </div>
       </div>
 

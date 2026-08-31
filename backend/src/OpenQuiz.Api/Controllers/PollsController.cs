@@ -28,6 +28,22 @@ public class PollsController : ControllerBase
         => Ok(await _polls.ListAsync(paging, ct));
 
     [EnableRateLimiting(RateLimitPolicies.Participation)]
+    [HttpGet("code/{code}")]
+    public async Task<ActionResult<PollDto>> GetByCode(string code, CancellationToken ct)
+    {
+        var p = await _polls.GetByJoinCodeAsync(code, ct);
+        return p is null ? NotFound() : Ok(p);
+    }
+
+    [EnableRateLimiting(RateLimitPolicies.Participation)]
+    [HttpGet("shared/{token}")]
+    public async Task<ActionResult<PollDto>> GetShared(string token, CancellationToken ct)
+    {
+        var p = await _polls.GetByShareTokenAsync(token, ct);
+        return p is null ? NotFound() : Ok(p);
+    }
+
+    [EnableRateLimiting(RateLimitPolicies.Participation)]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PollDto>> Get(Guid id, CancellationToken ct)
     {
@@ -83,6 +99,37 @@ public class PollsController : ControllerBase
     [HttpPost("{id:guid}/join")]
     public async Task<ActionResult<PollDto>> Join(Guid id, [FromBody] JoinPollRequest req, CancellationToken ct)
         => Ok(await _polls.JoinAsync(id, req, ct));
+
+    [Authorize]
+    [HttpGet("{id:guid}/collaborators")]
+    public async Task<ActionResult<IReadOnlyList<CollaboratorDto>>> Collaborators(Guid id, CancellationToken ct)
+        => Ok(await _polls.ListCollaboratorsAsync(id, ct));
+
+    [Authorize]
+    [HttpPost("{id:guid}/collaborators")]
+    public async Task<ActionResult<CollaboratorDto>> AddCollaborator(Guid id, [FromBody] AddCollaboratorRequest req, CancellationToken ct)
+        => Ok(await _polls.AddCollaboratorAsync(id, req, ct));
+
+    [Authorize]
+    [HttpDelete("{id:guid}/collaborators/{userId:guid}")]
+    public async Task<IActionResult> RemoveCollaborator(Guid id, Guid userId, CancellationToken ct)
+    {
+        await _polls.RemoveCollaboratorAsync(id, userId, ct);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/results-share")]
+    public async Task<ActionResult<PollDto>> EnableResultsShare(Guid id, CancellationToken ct)
+        => Ok(await _polls.EnableResultsShareAsync(id, ct));
+
+    [Authorize]
+    [HttpDelete("{id:guid}/results-share")]
+    public async Task<IActionResult> DisableResultsShare(Guid id, CancellationToken ct)
+    {
+        await _polls.DisableResultsShareAsync(id, ct);
+        return NoContent();
+    }
 
     /// <summary>
     /// Owner-only dump the export buttons fetch. Gated on <c>reports.export</c>

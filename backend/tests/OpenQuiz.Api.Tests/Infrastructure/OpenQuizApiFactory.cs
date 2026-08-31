@@ -31,6 +31,7 @@ public sealed class OpenQuizApiFactory : WebApplicationFactory<Program>
             // serialise the suite behind redundant schema checks.
             ["App:AutoMigrate"] = "false",
             ["App:PublicUrl"] = "https://openquiz.test",
+            ["Media:RootPath"] = Path.Combine(Path.GetTempPath(), "openquiz-tests-media", Guid.NewGuid().ToString("N")),
             // Off unless a test opts in, so unrelated tests cannot exhaust the
             // window for each other.
             ["RateLimiting:Enabled"] = "false",

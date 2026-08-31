@@ -3,24 +3,37 @@ import { X, Copy, Share2, Users, CheckCircle, Link } from 'lucide-react';
 import { realtimeService } from '../services/realtimeService';
 import { pollService } from '../services/pollService';
 import { useTranslation } from 'react-i18next';
+import { voterJoinUrl } from '../utils/sessionRoute';
 
-export default function QrModal({ pollId, onClose, title }) {
+export default function QrModal({ pollId, onClose, title, joinCode: joinCodeProp }) {
   const { t } = useTranslation();
   const [participantCount, setParticipantCount] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [joinCode, setJoinCode] = useState(joinCodeProp || '');
+  const [qrImageUrl, setQrImageUrl] = useState('');
 
-  const currentUrl = window.location.origin;
-  const joinUrl = `${currentUrl}?mode=voter&id=${pollId}`;
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(joinUrl)}`;
+  const joinUrl = voterJoinUrl(window.location.origin, { code: joinCode, pollId });
 
   useEffect(() => {
     let active = true;
-    pollService.get(pollId).then((p) => { if (active && p) setParticipantCount(p.participantCount || 0); }).catch(() => {});
+    pollService.get(pollId).then((p) => {
+      if (!active || !p) return;
+      setParticipantCount(p.participantCount || 0);
+      if (p.joinCode) setJoinCode(p.joinCode);
+    }).catch(() => {});
     const unsubPromise = realtimeService.subscribe(pollId, {
       onPollUpdated: (p) => { if (active) setParticipantCount(p.participantCount || 0); },
     });
     return () => { active = false; unsubPromise.then((u) => u && u()); };
   }, [pollId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    import('qrcode').then((mod) => mod.default.toDataURL(joinUrl, { width: 448, margin: 1, errorCorrectionLevel: 'M' }))
+      .then((url) => { if (!cancelled) setQrImageUrl(url); })
+      .catch(() => { if (!cancelled) setQrImageUrl(''); });
+    return () => { cancelled = true; };
+  }, [joinUrl]);
 
   const handleCopyLink = async () => {
     try {
@@ -53,6 +66,7 @@ export default function QrModal({ pollId, onClose, title }) {
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden relative">
         <button
           onClick={onClose}
+          aria-label={t('common.close')}
           className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors z-10"
         >
           <X size={20} className="text-slate-600" />
@@ -62,13 +76,23 @@ export default function QrModal({ pollId, onClose, title }) {
           <h3 className="text-2xl font-bold text-slate-800 mb-2">{t('qr.title')}</h3>
           <p className="text-slate-500 mb-4 px-4">{title}</p>
 
+          {joinCode && (
+            <p className="font-mono tracking-[0.35em] text-4xl sm:text-5xl font-black text-slate-900 mb-4">
+              {joinCode}
+            </p>
+          )}
+
           <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full mb-4 animate-pulse">
             <Users size={18} />
             <span className="font-semibold">{t('qr.participantsWaiting', { count: participantCount })}</span>
           </div>
 
           <div className="bg-white p-4 rounded-xl border-2 border-slate-100 shadow-inner mb-4">
-            <img src={qrImageUrl} alt="QR Code" className="w-56 h-56 object-contain" />
+            {qrImageUrl ? (
+              <img src={qrImageUrl} alt={t('qr.title')} className="w-56 h-56 object-contain" />
+            ) : (
+              <div className="w-56 h-56 bg-slate-100 rounded-lg" />
+            )}
           </div>
 
           <div className="w-full bg-slate-50 rounded-xl p-3 mb-4">
@@ -84,7 +108,9 @@ export default function QrModal({ pollId, onClose, title }) {
                 className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-600 truncate"
               />
               <button
+                type="button"
                 onClick={handleCopyLink}
+                aria-label={t('qr.copyLink')}
                 className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1 ${copied
                     ? 'bg-emerald-500 text-white'
                     : 'bg-indigo-500 hover:bg-indigo-600 text-white'

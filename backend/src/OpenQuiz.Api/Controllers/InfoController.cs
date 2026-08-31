@@ -10,7 +10,7 @@ public class InfoController : ControllerBase
     public IActionResult Get() => Ok(new
     {
         name = "OpenQuiz API",
-        version = "0.1.0",
-        phase = "1 - skeleton"
+        version = "1.0.0",
+        phase = "session-product"
     });
 }
